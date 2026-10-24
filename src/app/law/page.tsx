@@ -81,7 +81,7 @@ export default function LawPage() {
     <div className="max-w-4xl space-y-6">
       <div className="space-y-3">
         <h1>Know Your Law</h1>
-        <p className="text-lg text-muted">Ask about an Act, a Rule or a filing in plain words. No upload needed.</p>
+        <p className="text-muted">Ask about an Act, a Rule or a filing in plain words. No upload needed.</p>
         <Link href="/law/knowledge" className="btn-ghost"><Library size={16} /> Acts in the library</Link>
       </div>
 

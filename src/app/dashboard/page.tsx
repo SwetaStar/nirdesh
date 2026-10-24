@@ -166,7 +166,7 @@ export default function Dashboard() {
         <section className="card p-5">
           <h2 className="mb-2 font-semibold">Systemic issues</h2>
           {data.issues.length === 0 ? (
-            <p className="text-base text-muted">None yet. When 3 or more judgments contain similar directions, Nirdesh flags a systemic issue and drafts a policy note.</p>
+            <p className="text-sm text-muted">None yet. When 3 or more judgments contain similar directions, Nirdesh flags a systemic issue and drafts a policy note.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {data.issues.map((i) => (

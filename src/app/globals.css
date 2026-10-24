@@ -5,10 +5,10 @@
   --color-brand-dark: #9c1249;
   --color-brand-soft: #fce4ec;
   --color-plum: #6a1b9a;
-  --color-lavender: #f6f1ea;
-  --color-ink: #1f1b2d;
-  --color-muted: #6f675f;
-  --color-line: #e8e0d6;
+  --color-lavender: #f6f0e4;
+  --color-ink: #1c1712;
+  --color-muted: #5b5147;
+  --color-line: #e3d8c3;
   --color-cream: #fbf8f4;
   --font-sans: var(--font-text), "Noto Sans", "Noto Sans Kannada", "Noto Sans Telugu", "Noto Sans Devanagari", system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, serif;
@@ -25,15 +25,14 @@ body {
   /* Page titles: serif display, like DayPilot. Utilities on a heading still override. */
   h1 {
     font-family: var(--font-display);
-    font-size: 2.25rem;
+    font-size: 1.875rem;
     font-weight: 600;
-    letter-spacing: -0.02em;
-    line-height: 1.15;
+    font-variation-settings: "opsz" 144;
+    line-height: 1.2;
   }
   h2 {
-    font-size: 1.3rem;
-    font-weight: 700;
-    letter-spacing: -0.01em;
+    font-size: 1.125rem;
+    font-weight: 600;
   }
   h1 + p {
     margin-top: 0.5rem;
@@ -44,7 +43,7 @@ body {
   @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(31,27,45,0.04)];
 }
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-base font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
   @apply btn bg-brand text-white hover:bg-brand-dark;
@@ -53,15 +52,15 @@ body {
   @apply btn border border-line bg-white text-ink hover:border-brand hover:text-brand;
 }
 @utility input {
-  @apply w-full rounded-xl border border-line bg-cream px-4 py-3 text-base outline-none placeholder:text-muted/80 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand-soft;
+  @apply w-full rounded-lg border border-line bg-cream px-3.5 py-2.5 text-sm outline-none placeholder:text-muted/80 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand-soft;
 }
 @utility label {
-  @apply mb-1.5 block text-base font-semibold text-ink;
+  @apply mb-1.5 block text-sm font-semibold text-ink;
 }
 
 /* Rendered markdown from agents (plans, drafts, explanations). */
 .prose-nirdesh {
-  @apply text-base leading-relaxed text-ink;
+  @apply text-sm leading-relaxed text-ink;
 }
 .prose-nirdesh h1, .prose-nirdesh h2, .prose-nirdesh h3 {
   @apply mt-4 mb-2 font-semibold;
@@ -72,7 +71,7 @@ body {
 .prose-nirdesh ul { @apply my-2 list-disc pl-5; }
 .prose-nirdesh ol { @apply my-2 list-decimal pl-5; }
 .prose-nirdesh blockquote { @apply my-2 border-l-4 border-brand-soft pl-3 italic text-muted; }
-.prose-nirdesh table { @apply my-3 w-full border-collapse text-sm; }
+.prose-nirdesh table { @apply my-3 w-full border-collapse text-xs; }
 .prose-nirdesh th { @apply border border-line bg-lavender px-2 py-1 text-left font-semibold; }
 .prose-nirdesh td { @apply border border-line px-2 py-1 align-top; }
 .prose-nirdesh code { @apply rounded bg-lavender px-1; }

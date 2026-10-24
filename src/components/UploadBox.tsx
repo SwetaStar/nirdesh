@@ -42,8 +42,8 @@ export function UploadBox({ role }: { role: "officer" | "citizen" }) {
         className={`card flex cursor-pointer flex-col items-center gap-3 border-2 border-dashed p-10 text-center transition ${drag ? "border-brand bg-brand-soft" : "hover:border-brand"}`}
       >
         {busy ? <Loader2 className="animate-spin text-brand" size={32} /> : <FileUp className="text-brand" size={32} />}
-        <span className="text-lg font-semibold">{busy ? "Uploading and reading the text…" : role === "citizen" ? "Drop your court order here, or click to choose" : "Drop a judgment here, or click to choose"}</span>
-        <span className="text-base text-muted">PDF or Word (.docx), up to 4 MB. Scanned PDFs work with Claude or Gemini.</span>
+        <span className="text-base font-semibold">{busy ? "Uploading and reading the text…" : role === "citizen" ? "Drop your court order here, or click to choose" : "Drop a judgment here, or click to choose"}</span>
+        <span className="text-sm text-muted">PDF or Word (.docx), up to 4 MB. Scanned PDFs work with Claude or Gemini.</span>
         <input type="file" accept=".pdf,.docx,application/pdf" className="hidden" disabled={busy}
           onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
       </label>

@@ -85,7 +85,7 @@ export default function HowItWorks() {
       <section className="card p-6">
         <h2 className="mb-4 text-lg font-semibold">The agents</h2>
         <ul className="grid gap-3 md:grid-cols-2">
-          {AGENTS.map((a) => <li key={a.name} className="rounded-2xl border border-line p-4"><p className="font-semibold">{a.name}</p><p className="text-base text-muted">{a.role}</p></li>)}
+          {AGENTS.map((a) => <li key={a.name} className="rounded-2xl border border-line p-4"><p className="font-semibold">{a.name}</p><p className="text-sm text-muted">{a.role}</p></li>)}
         </ul>
         <p className="mt-4 text-sm text-muted">Every AI output in Nirdesh is a live call to the model you choose in Settings. Nothing is pre-written. See the AI activity log in Settings for exactly what was sent and received.</p>
       </section>

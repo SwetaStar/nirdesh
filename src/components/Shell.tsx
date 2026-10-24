@@ -22,14 +22,14 @@ const NAV = [
 export function Logo({ small = false }: { small?: boolean }) {
   return (
     <span className="flex items-center gap-2.5">
-      <svg viewBox="0 0 32 32" className="h-9 w-9 shrink-0" aria-hidden>
+      <svg viewBox="0 0 32 32" className="h-8 w-8 shrink-0" aria-hidden>
         <rect width="32" height="32" rx="9" fill="#c2185b" />
         {/* A signpost: one pole, one direction */}
         <path d="M15 7h2v18h-2z" fill="#fff" />
         <path d="M9 9h11l3 3-3 3H9z" fill="#fff" />
         <path d="M23 17H12l-3 3 3 3h11z" fill="#fce4ec" />
       </svg>
-      {!small && <span className="font-display text-[1.6rem] font-semibold tracking-tight text-brand">Nirdesh</span>}
+      {!small && <span className="font-display text-2xl font-semibold text-brand [font-variation-settings:'opsz'_144]">Nirdesh</span>}
     </span>
   );
 }
@@ -65,7 +65,7 @@ function Clock() {
   if (!now) return null;
   const day = now.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }).replace(",", "");
   const time = now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  return <span className="font-mono text-lg text-muted">{day} · {time}</span>;
+  return <span className="font-mono text-base text-muted">{day} · {time}</span>;
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -83,7 +83,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-white py-6 transition-[width] md:flex ${collapsed ? "w-20 px-3" : "w-72 px-4"}`}>
+      <aside className={`sticky top-0 hidden h-screen shrink-0 flex-col border-r border-line bg-white py-6 transition-[width] md:flex ${collapsed ? "w-20 px-3" : "w-64 px-4"}`}>
         <Link href="/" className="mb-8 px-2" aria-label="Nirdesh home">
           <Logo small={collapsed} />
         </Link>
@@ -95,17 +95,17 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 title={collapsed ? label : undefined}
-                className={`flex items-center gap-3.5 rounded-xl px-3.5 py-3 text-[1.05rem] font-semibold transition ${
+                className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-base font-medium transition ${
                   active ? "bg-brand text-white shadow-sm" : "text-ink hover:bg-lavender"
                 } ${collapsed ? "justify-center px-0" : ""}`}
               >
-                <Icon size={22} strokeWidth={1.8} />
+                <Icon size={20} strokeWidth={1.8} />
                 {!collapsed && label}
               </Link>
             );
           })}
         </nav>
-        <button onClick={toggle} className={`mt-6 flex items-center gap-3 rounded-xl px-3.5 py-2 text-base font-semibold text-muted hover:text-ink ${collapsed ? "justify-center px-0" : ""}`}>
+        <button onClick={toggle} className={`mt-5 flex items-center gap-3 rounded-xl px-3.5 py-2 text-sm font-medium text-muted hover:text-ink ${collapsed ? "justify-center px-0" : ""}`}>
           {collapsed ? <PanelLeftOpen size={20} /> : <><PanelLeftClose size={20} /> Collapse</>}
         </button>
         <div className="flex-1" />
@@ -131,7 +131,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         {ai && !ai.ready && path !== "/settings" && (
-          <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-8 py-3 text-base text-amber-900">
+          <div className="flex items-center justify-between gap-3 border-b border-amber-200 bg-amber-50 px-8 py-2.5 text-sm text-amber-900">
             <span className="flex items-center gap-2">
               <KeyRound size={18} /> Nirdesh uses your own AI key. Add one to start — Gemini offers a free key.
             </span>
@@ -139,7 +139,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </div>
         )}
         <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 py-8 md:px-10 md:py-10">
-          <div className="absolute top-11 right-10 hidden lg:block"><Clock /></div>
+          <div className="absolute top-12 right-10 hidden lg:block"><Clock /></div>
           {children}
         </main>
       </div>
