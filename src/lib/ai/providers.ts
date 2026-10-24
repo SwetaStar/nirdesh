@@ -177,7 +177,43 @@ export interface CallResult {
 }
 
 /** One call to the user's chosen provider. Throws on error. */
+/** Turn provider errors (often raw JSON) into a sentence a user can act on. */
+export function friendlyError(e: unknown, label: string, model: string): Error {
+  const raw = e instanceof Error ? e.message : String(e);
+  let code: number | undefined = (e as { status?: number })?.status;
+  let msg = raw;
+  try {
+    const j = JSON.parse(raw.slice(raw.indexOf("{")));
+    code = j?.error?.code ?? code;
+    msg = j?.error?.message ?? msg;
+  } catch {}
+  if (!code) code = Number(raw.match(/\b(4\d\d|5\d\d)\b/)?.[1]) || undefined;
+  const tail = ` (${label} · ${model})`;
+  if (code === 503 || /high demand|overloaded|unavailable/i.test(msg))
+    return new Error(`This model is busy right now — the provider says it has high demand. Nirdesh retried automatically. Try again in a minute, or pick a different model in Settings.${tail}`);
+  if (code === 429 || /quota|rate limit|resource.?exhausted/i.test(msg))
+    return new Error(`Usage limit reached for this key (free tiers allow only a few requests per minute or per day). Wait a minute, or pick a different model in Settings.${tail}`);
+  if (code === 401 || code === 403 || /api key|permission|unauthori[sz]ed|invalid.*key/i.test(msg))
+    return new Error(`The provider rejected the key. Check that it was copied completely in Settings.${tail}`);
+  if (code === 404 || /not found|does not exist|unsupported model/i.test(msg))
+    return new Error(`This model is not available for your key. Pick another model in Settings.${tail}`);
+  if (/failed to fetch|network/i.test(msg))
+    return new Error(`Could not reach the provider. Check your internet connection and try again.${tail}`);
+  return new Error(`${msg}${tail}`);
+}
+
 export async function callModel(args: CallArgs): Promise<CallResult> {
+  const { model, info } = activeConfig();
+  try {
+    return await callModelRaw(args);
+  } catch (e) {
+    // Our own messages (no key, cut-off answers, scanned PDF) pass through unchanged.
+    if (e instanceof Error && /^(No AI key|The answer was cut off|The model declined|.* cannot read scanned PDFs)/.test(e.message)) throw e;
+    throw friendlyError(e, info.label.split(" (")[0], model ?? "?");
+  }
+}
+
+async function callModelRaw(args: CallArgs): Promise<CallResult> {
   const { provider, key, model, info } = activeConfig();
   if (!key || !model) throw new Error("No AI key set. Open Settings and add a key.");
   if (args.pdfBase64 && !info.readsPdf)
@@ -204,7 +240,11 @@ export async function callModel(args: CallArgs): Promise<CallResult> {
     text = msg.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
     if (msg.stop_reason === "max_tokens") throw new Error("The answer was cut off (too long). Try again.");
   } else if (provider === "gemini") {
-    const ai = new GoogleGenAI({ apiKey: key });
+    // Retry when Google is busy (503) or rate-limiting (429): 4 attempts with growing waits.
+    const ai = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: { retryOptions: { attempts: 4, initialDelay: 2, maxDelay: 20, httpStatusCodes: [408, 429, 500, 502, 503, 504] } },
+    });
     const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = [];
     if (args.pdfBase64) parts.push({ inlineData: { mimeType: "application/pdf", data: args.pdfBase64 } });
     parts.push({ text: args.user });
