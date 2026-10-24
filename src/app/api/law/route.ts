@@ -3,6 +3,31 @@ import { db, jsonError, logSkill, must } from "@/lib/server/db";
 import { keywords } from "@/lib/chunk";
 import { normaliseForMatch } from "@/lib/rules";
 
+// Short names people use for Acts -> words in the Act's title (used to boost that Act).
+const ACT_ALIASES: [RegExp, string][] = [
+  [/\bfcra\b|foreign contribution|foreign donation|foreign fund/i, "foreign contribution"],
+  [/\brti\b|right to information/i, "right to information"],
+  [/\bdpdp\b|data protection|personal data/i, "personal data"],
+  [/\bibc\b|insolvenc|bankrupt/i, "insolvency"],
+  [/\bdlsa\b|\bnalsa\b|\bslsa\b|legal aid|free legal|lok adalat/i, "legal services"],
+  [/\beia\b|environment(al)? (impact|clearance)|public hearing/i, "environment impact"],
+  [/\blimitation\b|time.?barred|condonation of delay/i, "limitation"],
+  [/mgnrega|nrega|vb-?g|ram g|job card|rural employment|rozgar/i, "rozgar"],
+  [/consumer/i, "consumer protection"],
+  [/\bbnss\b|\bcrpc\b|arrest|\bfir\b|\bbail\b|police/i, "nagarik suraksha"],
+  [/\bbns\b|\bipc\b|offence|punishment/i, "nyaya sanhita"],
+  [/contempt/i, "contempt"],
+  [/senior citizen|old age|parents.*maintenance|maintenance.*parents/i, "senior citizens"],
+  [/\bsebi\b|securities|stock market/i, "securities and exchange"],
+];
+// Everyday words -> the words Acts use.
+const SYNONYMS: Record<string, string[]> = {
+  employ: ["servant", "employee"], employee: ["servant"], employed: ["servant"], job: ["employment"],
+  ngo: ["association", "organisation"], trustee: ["trust"], donation: ["contribution"], fund: ["contribution"],
+  complaint: ["complaint"], refund: ["refund"], lawyer: ["advocate"], arrested: ["arrest"],
+};
+const stemOf = (w: string) => (w.length > 5 ? w.replace(/(ies|es|s|ed|ing)$/, "") : w);
+
 /**
  * Keyword retrieval over Bare Act sections (handoff section 9: keyword search is enough
  * for the demo and keeps quotes exact). Any-term match in Postgres, ranked here by term hits.
@@ -20,26 +45,39 @@ export async function GET(req: Request) {
       .map((d) => ({ id: d.id, title: d.title, act_year: d.act_year, version_note: d.version_note, uploaded_at: d.uploaded_at, source_url: d.source_url ?? null }));
     if (!terms.length || !lawDocs.length) return Response.json({ chunks: [], documents: lawDocs });
 
-    const words = terms.map((t) => t.replace(/[^a-z0-9]/g, "")).filter(Boolean);
+    const base = terms.map((t) => t.replace(/[^a-z0-9]/g, "")).filter(Boolean);
+    const words = [...new Set([...base, ...base.flatMap((w) => SYNONYMS[w] ?? [])])];
+    // Acts the question names (by title or common short name) get a strong boost.
+    const named = new Set(ACT_ALIASES.filter(([re]) => re.test(q)).map(([, t]) => t));
+    const boostDocs = new Set(lawDocs.filter((d) => [...named].some((t) => d.title.toLowerCase().includes(t))).map((d) => d.id));
     const ids = lawDocs.map((d) => d.id);
     const query = (tsq: string, limit: number) =>
       sb.from("knowledge_chunks").select("id, document_id, section_ref, heading, content").in("document_id", ids).textSearch("tsv", tsq, { config: "english" }).limit(limit);
     // Sections containing ALL key words are the strongest candidates; a wide ANY-word pool fills the rest.
-    const [all, any] = await Promise.all([query(words.join(" & "), 60), query(words.join(" | "), 500)]);
+    const [all, any, inNamed] = await Promise.all([
+      query(base.join(" & "), 60),
+      query(words.join(" | "), 500),
+      // Always include the named Acts' matching sections, even if other Acts match more words.
+      boostDocs.size
+        ? sb.from("knowledge_chunks").select("id, document_id, section_ref, heading, content").in("document_id", [...boostDocs]).textSearch("tsv", words.join(" | "), { config: "english" }).limit(200)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
     const pool = new Map<string, { id: string; document_id: string; section_ref: string; heading: string; content: string }>();
-    for (const r of [...must(all), ...must(any)]) pool.set(r.id, r);
-    // Rank: distinct key words present (stem-tolerant), words in the section title, then how often they occur.
-    const stem = (w: string) => w.slice(0, Math.max(4, w.length - 2));
+    for (const r of [...must(all), ...must(any), ...must(inNamed)]) pool.set(r.id, r);
+    // Rank: named Act first, then distinct key words present (whole words, light stemming),
+    // words in the section title, then how often they occur. "professor" must not match "professional".
     const scored = [...pool.values()]
       .map((r) => {
         const head = r.heading.toLowerCase();
         const body = r.content.toLowerCase();
-        let score = 0;
+        let score = boostDocs.has(r.document_id) ? 12 : 0;
         for (const w of words) {
-          const st = stem(w);
-          if (body.includes(st) || head.includes(st)) score += 3;
-          if (head.includes(st)) score += 4;
-          score += Math.min(3, body.split(st).length - 1) * 0.3;
+          const re = new RegExp(`\\b${stemOf(w)}(s|es|ed|ing|ies|ment|ments|ion|ions|ee|ees|al)?\\b`, "g");
+          const hits = (body.match(re) ?? []).length;
+          if (hits || re.test(head)) score += 3;
+          re.lastIndex = 0;
+          if (re.test(head)) score += 4;
+          score += Math.min(3, hits) * 0.3;
         }
         // Index pages and very long fragments are rarely the best answer.
         if (/arrangement of sections/i.test(r.section_ref)) score -= 5;
