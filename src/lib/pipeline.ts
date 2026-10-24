@@ -6,7 +6,7 @@
 // from the last saved stage.
 
 import type { ZodType } from "zod";
-import { callModel, extractJson, type CallArgs } from "@/lib/ai/providers";
+import { callModel, canSearchOfficial, extractJson, searchOfficial, type CallArgs, type OfficialSearchResult } from "@/lib/ai/providers";
 import { CITIZEN_PROMPT, CRITIC_PROMPT, EXTRACTOR_PROMPT, LAWGUIDE_PROMPT, PLANNER_PROMPT } from "@/lib/ai/prompts";
 import { CriticOutput, ExtractorOutput } from "@/lib/schemas";
 import { CORRECTION_ROUNDS } from "@/lib/rules";
@@ -316,47 +316,6 @@ export async function runLawGuide(question: string, language: string) {
   const { z } = await import("zod");
   const { OFFICIAL_SOURCES } = await import("@/lib/sources");
   await logSkill("know-your-law", "started", question.slice(0, 80));
-  type Found = { chunks: LawChunk[]; documents: LawChunk["document"][] };
-  const search = (q: string) => api<Found>(`/api/law?k=12&q=${encodeURIComponent(q)}`);
-  // 1. Search the library with the question itself.
-  let found = await search(question);
-  // 2. Nothing found but the library has Acts? Let the AI suggest English search terms and try once more.
-  if (!found.chunks.length && found.documents.length) {
-    const Terms = z.object({ terms: z.array(z.string()).default([]) });
-    const t = await runJsonAgent(
-      "Nirdesh_LawGuide (search terms)",
-      Terms,
-      {
-        system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
-        user: question,
-        effort: "low",
-        maxTokens: 4000,
-      },
-      "00000000-0000-0000-0000-000000000000",
-    ).catch(() => ({ terms: [] as string[] }));
-    if (t.terms.length) found = await search([question, ...t.terms].join(" "));
-  }
-  // 3. Still nothing: answer with the fixed "not in library" text. No AI call, so nothing can be guessed.
-  if (!found.chunks.length) {
-    const { NOT_IN_LIBRARY } = await import("@/lib/notInLibrary");
-    const { sourcesFor } = await import("@/lib/sources");
-    const t = NOT_IN_LIBRARY[language] ?? NOT_IN_LIBRARY.English;
-    const official = [...new Set(["indiacode", ...sourcesFor(question).map((o) => o.id), "egazette"])];
-    const ans: LawAnswer = {
-      in_one_line: t.one, what_to_do: t.steps, law_says: [], be_careful: t.careful, uncertain: true,
-      uncertain_reason: t.reason, acts_used: [],
-      legal_aid: { summary: "The question concerns a law that is not in Nirdesh's library, so no section could be quoted.", facts_given: [], sections: [], open_questions: ["Which Act and section apply?", "Do the facts of my case change the answer?"] },
-      official_sources: official,
-    };
-    await api("/api/law", {
-      method: "POST",
-      json: { question, language, answer_layers: ans, acts_cited: [], uncertain: true, quotes: [], handoff: { summary: ans.legal_aid!.summary, sections: [], open_questions: ans.legal_aid!.open_questions } },
-    }).catch(() => {});
-    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true };
-  }
-  const context = found.chunks
-    .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
-    .join("\n\n---\n\n");
   // Lenient on shape (small models return a boolean or a single string where a list is expected),
   // strict on content: quotes are still verified word for word against the Act afterwards.
   // Flatten anything a model returns (string, list, nested object) into readable text — never "[object Object]".
@@ -377,6 +336,56 @@ export async function runLawGuide(question: string, language: string) {
     legal_aid: z.preprocess((v) => (v && typeof v === "object" ? v : null), z.object({ summary: str, facts_given: strList.default([]), sections: strList.default([]), open_questions: strList.default([]) }).nullable()).default(null),
     official_sources: strList.default([]),
   });
+  type Found = { chunks: LawChunk[]; documents: LawChunk["document"][] };
+  const search = (q: string) => api<Found>(`/api/law?k=12&q=${encodeURIComponent(q)}`);
+  // 1. Search the library with the question itself.
+  let found = await search(question);
+  // 2. Nothing found but the library has Acts? Let the AI suggest English search terms and try once more.
+  if (!found.chunks.length && found.documents.length) {
+    const Terms = z.object({ terms: z.array(z.string()).default([]) });
+    const t = await runJsonAgent(
+      "Nirdesh_LawGuide (search terms)",
+      Terms,
+      {
+        system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
+        user: question,
+        effort: "low",
+        maxTokens: 4000,
+      },
+      "00000000-0000-0000-0000-000000000000",
+    ).catch(() => ({ terms: [] as string[] }));
+    if (t.terms.length) found = await search([question, ...t.terms].join(" "));
+  }
+  // 3. Still nothing in the library. With Claude or Gemini, answer from official government websites
+  //    (live search restricted to the official list); anything not backed by an official page is discarded.
+  if (!found.chunks.length && canSearchOfficial()) {
+    const live = await runOfficialSearch(question, language, Answer).catch((e) => {
+      console.warn("official search failed", e);
+      return null;
+    });
+    if (live) return live;
+  }
+  // 4. Otherwise: the fixed "not in library" text. No AI call, so nothing can be guessed.
+  if (!found.chunks.length) {
+    const { NOT_IN_LIBRARY } = await import("@/lib/notInLibrary");
+    const { sourcesFor } = await import("@/lib/sources");
+    const t = NOT_IN_LIBRARY[language] ?? NOT_IN_LIBRARY.English;
+    const official = [...new Set(["indiacode", ...sourcesFor(question).map((o) => o.id), "egazette"])];
+    const ans: LawAnswer = {
+      in_one_line: t.one, what_to_do: t.steps, law_says: [], be_careful: t.careful, uncertain: true,
+      uncertain_reason: t.reason, acts_used: [],
+      legal_aid: { summary: "The question concerns a law that is not in Nirdesh's library, so no section could be quoted.", facts_given: [], sections: [], open_questions: ["Which Act and section apply?", "Do the facts of my case change the answer?"] },
+      official_sources: official,
+    };
+    await api("/api/law", {
+      method: "POST",
+      json: { question, language, answer_layers: ans, acts_cited: [], uncertain: true, quotes: [], handoff: { summary: ans.legal_aid!.summary, sections: [], open_questions: ans.legal_aid!.open_questions } },
+    }).catch(() => {});
+    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true, live: null };
+  }
+  const context = found.chunks
+    .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
+    .join("\n\n---\n\n");
   const sourceList = OFFICIAL_SOURCES.map((o) => `${o.id}: ${o.name} (${o.url}) — ${o.topics.join("; ")}`).join("\n");
   const ans = (await runJsonAgent(
     "Nirdesh_LawGuide",
@@ -415,5 +424,46 @@ export async function runLawGuide(question: string, language: string) {
     shown.uncertain = true;
     shown.uncertain_reason = `${ans.uncertain_reason ? ans.uncertain_reason + " " : ""}The AI's quotations could not be found word for word in the uploaded Acts, so they are not shown.`;
   }
-  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false };
+  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false, live: null };
+}
+
+/** Know Your Law fallback: answer from official government websites only, clearly labelled as live search. */
+async function runOfficialSearch(question: string, language: string, Answer: ZodType<LawAnswer>) {
+  const { OFFICIAL_SOURCES } = await import("@/lib/sources");
+  const domains = [...new Set(OFFICIAL_SOURCES.map((o) => new URL(o.url).hostname.replace(/^www\./, "")))];
+  const system =
+    LAWGUIDE_PROMPT +
+    `\n\nLIVE SEARCH MODE: the knowledge base does not cover this question. Search ONLY these official Indian government websites: ${domains.join(", ")}. ` +
+    `Never rely on memory or any other website. Indian criminal law changed on 1 July 2024 (BNS, BNSS and BSA replaced IPC, CrPC and Evidence Act) — use the current law. ` +
+    `If the official sites do not clearly answer the question, set uncertain=true and say so.`;
+  const user =
+    `User's language: ${language}. Write every field in ${language}.\n` +
+    `Reply with ONE JSON object only: {"in_one_line","what_to_do":[3-5 steps],"law_says":[{"act","section","quote":"what the section says, in plain words (not a quotation)","chunk":"URL of the official page"}],"be_careful","uncertain","uncertain_reason","acts_used":[{"title","year"}],"legal_aid":{"summary","facts_given","sections","open_questions"}}.\n\n` +
+    `QUESTION: ${question}`;
+  const t0 = Date.now();
+  let r: OfficialSearchResult;
+  try {
+    r = await searchOfficial(system, user, domains);
+    await api("/api/log", { method: "POST", json: { kind: "ai_call", agent: "Nirdesh_LawGuide (official websites)", provider: r.provider, model: r.model, request_summary: user.slice(0, 1500), response_text: `${r.text}\n\nOFFICIAL SOURCES USED:\n${r.sources.map((s) => s.url).join("\n")}`, ok: true, duration_ms: r.durationMs } }).catch(() => {});
+  } catch (e) {
+    await api("/api/log", { method: "POST", json: { kind: "ai_call", agent: "Nirdesh_LawGuide (official websites)", request_summary: user.slice(0, 1500), ok: false, error: e instanceof Error ? e.message : String(e), duration_ms: Date.now() - t0 } }).catch(() => {});
+    throw e;
+  }
+  // No official page behind the answer -> do not show it.
+  if (!r.sources.length) return null;
+  let ans: LawAnswer;
+  try {
+    ans = Answer.parse(extractJson(r.text));
+  } catch {
+    return null;
+  }
+  const uniq = [...new Map(r.sources.map((s) => [s.url, s])).values()].slice(0, 8);
+  await api("/api/law", {
+    method: "POST",
+    json: {
+      question, language, answer_layers: { ...ans, live_sources: uniq }, acts_cited: ans.acts_used, uncertain: ans.uncertain, quotes: [],
+      handoff: ans.legal_aid ? { summary: ans.legal_aid.summary, sections: ans.legal_aid.sections, open_questions: ans.legal_aid.open_questions } : null,
+    },
+  }).catch(() => {});
+  return { answer: ans, quoteChecks: [] as { text: string; verbatim: boolean }[], sources: [] as LawChunk[], documents: [] as LawChunk["document"][], removedQuotes: 0, notInLibrary: false, live: { sources: uniq, model: `${r.provider}/${r.model}` } };
 }

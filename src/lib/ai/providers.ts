@@ -316,3 +316,87 @@ export function extractJson(text: string): unknown {
   if (start === -1 || end === -1) throw new Error("No JSON found in the model reply.");
   return JSON.parse(body.slice(start, end + 1));
 }
+
+export interface OfficialSearchResult {
+  text: string;
+  sources: { url: string; title: string; cited?: string }[];
+  provider: ProviderId;
+  model: string;
+  durationMs: number;
+}
+
+/** Only these providers can search the web from Nirdesh. */
+export function canSearchOfficial(provider: ProviderId = activeConfig().provider) {
+  return provider === "claude" || provider === "gemini";
+}
+
+const isOfficialHost = (host: string, allowed: string[]) =>
+  allowed.some((d) => host === d || host.endsWith(`.${d}`)) || /\.(gov|nic)\.in$/.test(host);
+
+/**
+ * Ask the model to answer from official government websites only (live search).
+ * Claude: web search restricted to the allowed domains. Gemini: Google Search grounding, then
+ * any source that is not an official government site is dropped.
+ */
+export async function searchOfficial(system: string, user: string, allowedDomains: string[]): Promise<OfficialSearchResult> {
+  const { provider, key, model, info } = activeConfig();
+  if (!key || !model) throw new Error("No AI key set. Open Settings and add a key.");
+  if (!canSearchOfficial(provider)) throw new Error(`${info.label} cannot search the web.`);
+  const t0 = performance.now();
+  try {
+    if (provider === "claude") {
+      const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+      const messages: Anthropic.MessageParam[] = [{ role: "user", content: user }];
+      let msg: Anthropic.Message | null = null;
+      // Server-side search may pause a long turn; continue it a few times.
+      for (let i = 0; i < 3; i++) {
+        msg = await client.messages
+          .stream({
+            model,
+            max_tokens: 16000,
+            system,
+            thinking: { type: "adaptive" },
+            output_config: { effort: "medium" },
+            tools: [{ type: "web_search_20260209", name: "web_search", allowed_domains: allowedDomains, max_uses: 5 }],
+            messages,
+          })
+          .finalMessage();
+        if (msg.stop_reason !== "pause_turn") break;
+        messages.push({ role: "assistant", content: msg.content });
+      }
+      if (!msg) throw new Error("No answer.");
+      if (msg.stop_reason === "refusal") throw new Error("The model declined this request.");
+      const sources: OfficialSearchResult["sources"] = [];
+      let text = "";
+      for (const b of msg.content) {
+        if (b.type === "text") {
+          text += b.text;
+          for (const c of b.citations ?? [])
+            if (c.type === "web_search_result_location") sources.push({ url: c.url, title: c.title ?? c.url, cited: c.cited_text });
+        } else if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+          for (const r of b.content) if (r.type === "web_search_result") sources.push({ url: r.url, title: r.title });
+        }
+      }
+      const official = sources.filter((s) => { try { return isOfficialHost(new URL(s.url).hostname, allowedDomains); } catch { return false; } });
+      return { text, sources: official, provider, model, durationMs: Math.round(performance.now() - t0) };
+    }
+    const ai = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: { retryOptions: { attempts: 3, initialDelay: 2, maxDelay: 20, httpStatusCodes: [408, 429, 500, 502, 503, 504] } },
+    });
+    const res = await ai.models.generateContent({
+      model,
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      config: { systemInstruction: system, tools: [{ googleSearch: {} }], maxOutputTokens: 16000 },
+    });
+    const chunks = res.candidates?.[0]?.groundingMetadata?.groundingChunks ?? [];
+    // Gemini returns redirect links; the title carries the site's domain.
+    const sources = chunks
+      .map((c) => ({ url: c.web?.uri ?? "", title: c.web?.title ?? "" }))
+      .filter((s) => s.url && isOfficialHost(s.title.toLowerCase().replace(/^www\./, ""), allowedDomains));
+    return { text: res.text ?? "", sources, provider, model, durationMs: Math.round(performance.now() - t0) };
+  } catch (e) {
+    if (e instanceof Error && /cannot search the web|No AI key/.test(e.message)) throw e;
+    throw friendlyError(e, info.label.split(" (")[0], model);
+  }
+}

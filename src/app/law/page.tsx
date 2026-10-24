@@ -101,6 +101,14 @@ export default function LawPage() {
 
       {a && r && (
         <section className="space-y-4">
+          {r.live && (
+            <div className="notice">
+              <span>
+                <b>Answered from official government websites (live search)</b> — not from Nirdesh&apos;s law library, so the exact wording is not checked.
+                Open the official pages below before relying on it.
+              </span>
+            </div>
+          )}
           {a.uncertain && (
             <div className="flex gap-3 rounded-2xl border-2 border-orange-300 bg-orange-50 p-5">
               <AlertTriangle className="shrink-0 text-orange-700" />
@@ -135,6 +143,17 @@ export default function LawPage() {
             <ul className="space-y-3">
               {a.law_says.map((l, i) => {
                 const ok = r.quoteChecks[i]?.verbatim;
+                if (r.live)
+                  // Live search: plain-language summary with the official page, never presented as a quotation.
+                  return (
+                    <li key={i}>
+                      <p className="text-sm font-semibold">{l.act} — {l.section}</p>
+                      <p className="mt-1 text-sm">{l.quote}</p>
+                      {/^https?:\/\//.test(l.chunk) && (
+                        <a href={l.chunk} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-dusk underline">Official page</a>
+                      )}
+                    </li>
+                  );
                 return (
                   <li key={i}>
                     <p className="text-sm font-semibold">{l.act} — {l.section}</p>
@@ -164,10 +183,23 @@ export default function LawPage() {
             <Scale size={18} /> Prepare for legal aid <Download size={16} />
           </button>
 
+          {r.live && (
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <h3 className="mb-2 text-sm font-semibold">Official pages used ({r.live.sources.length})</h3>
+              <ul className="space-y-1 text-sm">
+                {r.live.sources.map((s) => (
+                  <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer" className="text-dusk underline">{s.title || s.url}</a></li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="text-xs text-muted">
             <p>
               Based on:{" "}
-              {r.documents.length
+              {r.live
+                ? `live search of official government websites (${r.live.model}), ${new Date().toLocaleDateString("en-GB")}`
+                : r.documents.length
                 ? r.documents.map((d) => `${d.title}${d.act_year ? ` (${d.act_year})` : ""}${d.version_note ? ` — ${d.version_note}` : ""}, as uploaded on ${d.uploaded_at.slice(0, 10)}`).join("; ")
                 : "no Acts uploaded yet"}
             </p>
