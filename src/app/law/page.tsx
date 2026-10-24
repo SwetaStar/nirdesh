@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { AlertTriangle, BadgeCheck, Download, Library, Loader2, Scale } from "lucide-react";
 import { LANGUAGES, runLawGuide, type LawAnswer } from "@/lib/pipeline";
-import { isConfigured } from "@/lib/ai/providers";
+import { TINY_MODEL, currentModelSnapshot, isConfigured, subscribeSettings } from "@/lib/ai/providers";
 import { ErrorBox, download } from "@/components/ui";
 import { SourceChip, SourcesPanel } from "@/components/Sources";
 import { OFFICIAL_SOURCES, sourcesFor, type OfficialSource } from "@/lib/sources";
@@ -60,6 +60,7 @@ export default function LawPage() {
   const [error, setError] = useState<string | null>(null);
   const [r, setR] = useState<Result | null>(null);
   const [asked, setAsked] = useState("");
+  const model = useSyncExternalStore(subscribeSettings, currentModelSnapshot, () => "");
 
   async function ask() {
     setError(null);
@@ -93,6 +94,12 @@ export default function LawPage() {
         </div>
         <textarea className="input min-h-24" value={question} onChange={(e) => setQuestion(e.target.value)}
           placeholder="e.g. I work at IIM Visakhapatnam. Am I a government servant for the purpose of being a trustee in an NGO applying for FCRA registration?" />
+        {TINY_MODEL.test(model) && (
+          <div className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
+            Your AI model ({model}) is very small and often invents legal text, so its answers will usually be withheld.{" "}
+            <Link href="/settings" className="font-semibold underline">Choose a stronger model in Settings</Link>.
+          </div>
+        )}
         <button className="btn-primary" disabled={busy || question.trim().length < 8} onClick={ask}>
           {busy && <Loader2 size={18} className="animate-spin" />} {busy ? "Reading the law…" : "Ask"}
         </button>
@@ -101,10 +108,12 @@ export default function LawPage() {
 
       {a && r && (
         <section className="space-y-4">
-          {(r.languageNote || r.language !== lang) && (
-            <p className="text-xs text-mist">
-              {r.languageNote ?? `Answered in ${r.language}, the language your question is written in.`}
-            </p>
+          {r.languageNote && <p className="text-xs text-mist">{r.languageNote}</p>}
+          {!busy && r.language !== lang && (
+            <div className="notice">
+              <span>This answer is in {r.language}. You have now selected {lang}.</span>
+              <button className="shrink-0 rounded-lg bg-dusk px-3 py-1.5 text-sm font-medium text-paper-raised hover:bg-dusk-deep" onClick={ask}>Ask again in {lang}</button>
+            </div>
           )}
           {r.live && (
             <div className="notice">

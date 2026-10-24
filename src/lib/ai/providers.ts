@@ -400,3 +400,14 @@ export async function searchOfficial(system: string, user: string, allowedDomain
     throw friendlyError(e, info.label.split(" (")[0], model);
   }
 }
+
+/** Current model id, read safely in React (empty on the server, live-updated after Settings changes). */
+export function subscribeSettings(cb: () => void) {
+  window.addEventListener("nirdesh-settings", cb);
+  window.addEventListener("storage", cb);
+  return () => {
+    window.removeEventListener("nirdesh-settings", cb);
+    window.removeEventListener("storage", cb);
+  };
+}
+export const currentModelSnapshot = () => activeConfig().model ?? "";

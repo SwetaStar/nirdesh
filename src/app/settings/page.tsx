@@ -58,12 +58,16 @@ export default function SettingsPage() {
       // so the dropdown never shows a model that isn't actually selected.
       const cur = loadSettings();
       const saved = cur.model[p];
-      if (!saved || !merged.some((m) => m.id === saved)) {
+      // Nothing chosen, the saved model no longer exists, or it is a tiny model that cannot do the job:
+      // pre-select a recommended model and save it (and say so).
+      const tiny = !!saved && TINY_MODEL.test(saved);
+      if (!saved || tiny || !merged.some((m) => m.id === saved)) {
         const pick = recommendedModel(p, merged);
-        if (pick) {
+        if (pick && pick !== saved) {
           const next = { ...cur, model: { ...cur.model, [p]: pick } };
           saveSettings(next);
           setS(next);
+          if (tiny) setTest({ state: "ok", msg: `Switched from ${saved} (too small for legal answers) to ${pick}.` });
         }
       }
     } catch (e) {
