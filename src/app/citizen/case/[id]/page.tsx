@@ -79,7 +79,7 @@ export default function CitizenCase() {
   const words = explanation ? explanation.content.split(/\s+/).filter(Boolean).length : 0;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6">
       <CaseHeader b={b} />
       <Progress stage={stage} live={live} error={error} onRetry={run} />
 

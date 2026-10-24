@@ -11,9 +11,9 @@ export default function CitizenPage() {
     localStorage.setItem("nirdesh.lang", l);
   };
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="max-w-3xl space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold">Understand your court order</h1>
+        <h1>Understand your court order</h1>
         <p className="mt-2 text-lg text-muted">Upload the order you won. Nirdesh will tell you, in simple words, what the government must do, by when, and what you can do.</p>
       </div>
 

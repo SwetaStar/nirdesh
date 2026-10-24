@@ -73,14 +73,14 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Settings</h1>
+        <h1>Settings</h1>
         <p className="text-muted">Choose the AI that powers Nirdesh&apos;s agents.</p>
       </div>
 
       <section className="card space-y-5 p-6">
         <div>
           <h2 className="font-semibold">AI Provider</h2>
-          <p className="text-sm text-muted">
+          <p className="text-base text-muted">
             Your key is stored only in this browser and sent directly to the provider — never to the Nirdesh server.
           </p>
         </div>
@@ -161,7 +161,7 @@ export default function SettingsPage() {
           {modelErr && <p className="mt-1 text-xs text-red-700">{modelErr}</p>}
         </div>
 
-        <p className="text-sm text-muted">{info.note}</p>
+        <p className="text-base text-muted">{info.note}</p>
 
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn-primary" disabled={!key || !model || test.state === "running"} onClick={runTest}>
@@ -217,14 +217,14 @@ function AILog() {
       <button className="flex w-full items-center justify-between" onClick={() => { setOpen(!open); if (!calls) load(); }}>
         <div className="text-left">
           <h2 className="font-semibold">AI activity log</h2>
-          <p className="text-sm text-muted">See exactly what each agent sent and got back. Every output is a live model call.</p>
+          <p className="text-base text-muted">See exactly what each agent sent and got back. Every output is a live model call.</p>
         </div>
         {open ? <ChevronDown /> : <ChevronRight />}
       </button>
       {open && (
         <div className="mt-4 space-y-2">
           {err && <p className="text-sm text-red-700">{err}</p>}
-          {calls?.length === 0 && <p className="text-sm text-muted">No AI calls yet.</p>}
+          {calls?.length === 0 && <p className="text-base text-muted">No AI calls yet.</p>}
           {calls?.map((c) => (
             <div key={c.id} className="rounded-xl border border-line">
               <button className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm" onClick={() => expand(c.id)}>

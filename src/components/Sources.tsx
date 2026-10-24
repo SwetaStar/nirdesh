@@ -32,9 +32,9 @@ export function SourceCard({ s }: { s: OfficialSource }) {
     <a href={s.url} target="_blank" rel="noreferrer" className="group flex gap-3 rounded-2xl border border-line bg-white p-3 transition hover:border-brand">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand"><Icon size={18} /></span>
       <span className="min-w-0">
-        <span className="flex items-center gap-1 text-sm font-medium group-hover:text-brand">{s.name} <ExternalLink size={12} /></span>
-        <span className="block text-xs text-muted">{host(s.url)}</span>
-        <span className="mt-1 block text-xs">{s.topics.join(" · ")}</span>
+        <span className="flex items-center gap-1 text-base font-semibold group-hover:text-brand">{s.name} <ExternalLink size={12} /></span>
+        <span className="block text-sm text-muted">{host(s.url)}</span>
+        <span className="mt-1 block text-sm">{s.topics.join(" · ")}</span>
       </span>
     </a>
   );
@@ -48,8 +48,8 @@ export function SourcesPanel({ defaultOpen = false }: { defaultOpen?: boolean })
     <section className="card p-5">
       <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen(!open)}>
         <span>
-          <span className="block font-semibold">Official government sources</span>
-          <span className="text-sm text-muted">Where to read the official text yourself — {OFFICIAL_SOURCES.length} sites. Links open the government website.</span>
+          <span className="block text-xl font-bold">Official government sources</span>
+          <span className="text-base text-muted">Where to read the official text yourself — {OFFICIAL_SOURCES.length} sites. Links open the government website.</span>
         </span>
         {open ? <ChevronDown /> : <ChevronRight />}
       </button>

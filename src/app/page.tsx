@@ -29,11 +29,11 @@ export default function Home() {
   return (
     <div className="space-y-10">
       <section className="space-y-3">
-        <p className="text-sm font-medium tracking-wide text-brand uppercase">Nirdesh · निर्देश · direction</p>
-        <h1 className="max-w-3xl text-3xl font-semibold leading-tight md:text-4xl">
+        <p className="text-sm font-semibold tracking-widest text-brand uppercase">Nirdesh · निर्देश · direction</p>
+        <h1 className="max-w-4xl text-4xl leading-tight md:text-[2.8rem]">
           When a court orders the government to act, Nirdesh makes sure it gets done on time — and that the citizen who won knows their rights.
         </h1>
-        <p className="flex items-center gap-2 text-muted">
+        <p className="flex items-center gap-2 text-lg text-muted">
           <ShieldCheck size={18} className="text-brand" /> The AI reads, checks, reminds and drafts. Humans decide.
         </p>
       </section>
@@ -44,8 +44,8 @@ export default function Home() {
             <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
               <Icon size={22} />
             </span>
-            <h2 className="text-lg font-semibold">{title}</h2>
-            <p className="flex-1 text-sm text-muted">{body}</p>
+            <h2 className="text-xl font-bold">{title}</h2>
+            <p className="flex-1 text-base text-muted">{body}</p>
             <span className="btn-primary self-start">{cta}</span>
           </Link>
         ))}

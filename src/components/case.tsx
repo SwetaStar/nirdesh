@@ -85,7 +85,7 @@ export function CaseHeader({ b }: { b: Bundle }) {
   return (
     <div className="card p-6">
       <p className="text-xs tracking-wide text-muted uppercase">{o.court ?? "Court"}</p>
-      <h1 className="text-xl font-semibold">{o.case_number ?? o.file_name}</h1>
+      <h1 className="text-3xl">{o.case_number ?? o.file_name}</h1>
       <p className="mt-1 text-sm text-muted">
         {o.petitioners && <>{o.petitioners} <span className="mx-1">vs</span> {o.respondents}</>}
         {o.judgment_date && <> · Judgment dated {o.judgment_date}</>}

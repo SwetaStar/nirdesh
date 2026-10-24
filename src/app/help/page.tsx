@@ -72,7 +72,7 @@ export default function HelpPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Help &amp; About</h1>
+        <h1>Help &amp; About</h1>
         <p className="text-muted">What Nirdesh does, why it exists, and how to use it.</p>
       </div>
 

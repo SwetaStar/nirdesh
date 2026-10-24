@@ -149,14 +149,14 @@ export default function KnowledgePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Law library</h1>
+        <h1>Law library</h1>
         <p className="text-muted">Bare Acts and Rules that LawGuide may quote. Upload the official text (e.g. from India Code). Nirdesh never invents legal text.</p>
       </div>
 
       {pending.length > 0 && (
         <section className="card space-y-3 border-amber-300 p-6">
           <h2 className="font-semibold text-amber-900">New versions waiting for review ({pending.length})</h2>
-          <p className="text-sm text-muted">The nightly check found a changed file on the official site. It is <b>not</b> used in answers until a person approves it. The current version stays in use meanwhile.</p>
+          <p className="text-base text-muted">The nightly check found a changed file on the official site. It is <b>not</b> used in answers until a person approves it. The current version stays in use meanwhile.</p>
           {pending.map((d) => {
             const old = docs?.find((o) => o.id === d.supersedes);
             return (
@@ -210,7 +210,7 @@ export default function KnowledgePage() {
             <Clock size={14} /> Update check runs nightly at 2:00 AM IST · run it now <ExternalLink size={12} />
           </a>
         </div>
-        {current.length === 0 && <p className="text-sm text-muted">No Acts yet. Until you add some, LawGuide will say the law is not in its knowledge base and offer a legal-aid handover.</p>}
+        {current.length === 0 && <p className="text-base text-muted">No Acts yet. Until you add some, LawGuide will say the law is not in its knowledge base and offer a legal-aid handover.</p>}
         {current.length > 0 && (
           <table className="w-full text-left text-sm">
             <thead className="bg-lavender"><tr>{["Title", "Status", "Version", "Sections", "Official link", "Last update check", ""].map((h) => <th key={h} className="px-3 py-2">{h}</th>)}</tr></thead>

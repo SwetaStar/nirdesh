@@ -78,12 +78,10 @@ export default function LawPage() {
 
   const a = r?.answer;
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-semibold">Know Your Law</h1>
-          <p className="mt-1 text-lg text-muted">Ask about an Act, a Rule or a filing in plain words. No upload needed.</p>
-        </div>
+    <div className="max-w-4xl space-y-6">
+      <div className="space-y-3">
+        <h1>Know Your Law</h1>
+        <p className="text-lg text-muted">Ask about an Act, a Rule or a filing in plain words. No upload needed.</p>
         <Link href="/law/knowledge" className="btn-ghost"><Library size={16} /> Acts in the library</Link>
       </div>
 
