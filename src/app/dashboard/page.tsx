@@ -35,7 +35,11 @@ const SKILL_LABEL: Record<string, string> = {
   "policy-insights": "Policy insights",
   "live-compliance-dashboard": "Live compliance dashboard",
   "know-your-law": "Know Your Law",
+  "knowledge-sync": "Law library update",
 };
+
+/** Feed text: show only the website name for long links so entries stay inside the panel. */
+const shortenLinks = (t: string) => t.replace(/https?:\/\/([^/\s]+)\S*/g, (_, host: string) => host.replace(/^www\./, ""));
 const SKILL_ORDER = Object.keys(SKILL_LABEL);
 const RUNNING = new Set(["needs_ocr", "uploaded", "critic_round_1", "correcting_1", "critic_round_2", "correcting_2", "critic_round_3"]);
 const URGENCY: Record<string, number> = { overdue: 0, urgent: 1, due_soon: 2, date_pending: 3, on_track: 4, no_deadline: 5, paused: 6 };
@@ -174,17 +178,19 @@ export default function Dashboard() {
       </div>
 
       {/* Right: live activity feed */}
-      <aside className="card h-fit p-4">
+      <aside className="card h-fit min-w-0 overflow-hidden p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Activity size={16} className="text-brand" /> Live activity</h2>
         {data.activity.length === 0 && <p className="text-xs text-muted">No activity yet.</p>}
         <ul className="space-y-3">
           {data.activity.map((a) => (
-            <li key={a.id} className="text-xs">
+            <li key={a.id} className="min-w-0 text-xs">
               <p className="flex items-center gap-1">
-                <span className={`h-1.5 w-1.5 rounded-full ${a.event === "failed" ? "bg-red-500" : a.event === "completed" ? "bg-emerald-500" : "bg-amber-500"}`} />
-                <b>{SKILL_LABEL[a.skill] ?? a.skill}</b> <span className="text-muted">{a.event}</span>
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.event === "failed" ? "bg-red-500" : a.event === "completed" ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <b className="truncate">{SKILL_LABEL[a.skill] ?? a.skill}</b> <span className="shrink-0 text-muted">{a.event}</span>
               </p>
-              {a.detail && <p className="text-muted">{a.detail}</p>}
+              {a.detail && (
+                <p className="line-clamp-3 text-muted [overflow-wrap:anywhere]" title={a.detail}>{shortenLinks(a.detail)}</p>
+              )}
               <p className="text-[10px] text-muted">{new Date(a.ts).toLocaleTimeString()}</p>
             </li>
           ))}
