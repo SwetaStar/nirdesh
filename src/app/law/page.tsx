@@ -6,6 +6,8 @@ import { AlertTriangle, BadgeCheck, Download, Library, Loader2, Scale } from "lu
 import { LANGUAGES, runLawGuide, type LawAnswer } from "@/lib/pipeline";
 import { isConfigured } from "@/lib/ai/providers";
 import { ErrorBox, download } from "@/components/ui";
+import { SourceChip, SourcesPanel } from "@/components/Sources";
+import { OFFICIAL_SOURCES, sourcesFor, type OfficialSource } from "@/lib/sources";
 
 type Result = Awaited<ReturnType<typeof runLawGuide>>;
 
@@ -32,11 +34,22 @@ function handoffMarkdown(question: string, a: LawAnswer, r: Result) {
     "## Open questions",
     ...(la?.open_questions ?? []).map((q) => `- ${q}`),
     "",
+    "## Where to read the official text",
+    ...answerSources(question, a).map((o) => `- ${o.name}: ${o.url}`),
+    "",
     "## Law versions used",
     ...r.documents.map((d) => `- ${d.title}${d.act_year ? ` (${d.act_year})` : ""}${d.version_note ? ` — ${d.version_note}` : ""}, uploaded ${d.uploaded_at.slice(0, 10)}`),
     "",
     "Free legal aid: your nearest District Legal Services Authority (DLSA) or a law-school legal-aid clinic.",
   ].join("\n");
+}
+
+/** Official sites for this answer: the ones LawGuide named, plus keyword matches on the question. */
+function answerSources(question: string, a: LawAnswer): OfficialSource[] {
+  const named = a.official_sources.map((id) => OFFICIAL_SOURCES.find((o) => o.id === id)).filter((o): o is OfficialSource => !!o);
+  const out = [...named];
+  for (const o of [...a.law_says.flatMap((l) => sourcesFor(l.act, 1)), ...sourcesFor(question)]) if (!out.some((x) => x.id === o.id)) out.push(o);
+  return out.slice(0, 5);
 }
 
 export default function LawPage() {
@@ -121,6 +134,7 @@ export default function LawPage() {
                     <p className={`mt-1 flex items-center gap-1 text-xs ${ok ? "text-emerald-700" : "text-red-700"}`}>
                       {ok ? <><BadgeCheck size={14} /> Quote found word for word in the uploaded Act</> : <><AlertTriangle size={14} /> Could not match this quote word for word — check the Act before relying on it</>}
                     </p>
+                    <OfficialTextLink act={l.act} chunk={r.sources[Number(l.chunk.replace(/\D/g, "")) - 1]} />
                   </li>
                 );
               })}
@@ -130,6 +144,13 @@ export default function LawPage() {
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-amber-800 uppercase">Be careful</h3>
             <p className="text-base whitespace-pre-line">{a.be_careful}</p>
           </div>
+
+          {answerSources(asked, a).length > 0 && (
+            <div className="rounded-2xl border border-line bg-white p-4">
+              <h3 className="mb-2 text-sm font-semibold">Read the official text / file officially</h3>
+              <div className="flex flex-wrap gap-2">{answerSources(asked, a).map((o) => <SourceChip key={o.id} source={o} />)}</div>
+            </div>
+          )}
 
           <button className={`w-full py-4 text-base ${a.uncertain ? "btn-primary" : "btn-ghost"}`} onClick={() => download("legal-aid-question.md", handoffMarkdown(asked, a, r))}>
             <Scale size={18} /> Prepare for legal aid <Download size={16} />
@@ -146,6 +167,19 @@ export default function LawPage() {
           </div>
         </section>
       )}
+
+      <SourcesPanel defaultOpen={!r} />
     </div>
   );
+}
+
+function OfficialTextLink({ act, chunk }: { act: string; chunk?: Result["sources"][number] }) {
+  if (chunk?.document.source_url)
+    return (
+      <a href={chunk.document.source_url} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs text-brand underline">
+        Official text of {chunk.document.title}
+      </a>
+    );
+  const s = sourcesFor(act, 1)[0];
+  return s ? <div className="mt-1"><SourceChip source={s} label={`Official text: ${s.name}`} /></div> : null;
 }

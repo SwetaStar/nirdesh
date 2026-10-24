@@ -299,16 +299,18 @@ export interface LawAnswer {
   uncertain_reason: string | null;
   acts_used: { title: string; year: number | null }[];
   legal_aid: { summary: string; facts_given: string[]; sections: string[]; open_questions: string[] } | null;
+  official_sources: string[];
 }
 
 interface LawChunk {
   id: string; section_ref: string; heading: string; content: string;
-  document: { title: string; act_year: number | null; version_note: string | null; uploaded_at: string };
+  document: { title: string; act_year: number | null; version_note: string | null; uploaded_at: string; source_url: string | null };
 }
 
 /** Know Your Law: search terms -> keyword retrieval -> LawGuide four-layer answer -> code checks quotes. */
 export async function runLawGuide(question: string, language: string) {
   const { z } = await import("zod");
+  const { OFFICIAL_SOURCES } = await import("@/lib/sources");
   await logSkill("know-your-law", "started", question.slice(0, 80));
   const Terms = z.object({ terms: z.array(z.string()).default([]) });
   const t = await runJsonAgent(
@@ -323,7 +325,7 @@ export async function runLawGuide(question: string, language: string) {
     "00000000-0000-0000-0000-000000000000",
   ).catch(() => ({ terms: [] as string[] }));
   const q = [question, ...t.terms].join(" ");
-  const found = await api<{ chunks: LawChunk[]; documents: { title: string; act_year: number | null; version_note: string | null; uploaded_at: string }[] }>(
+  const found = await api<{ chunks: LawChunk[]; documents: LawChunk["document"][] }>(
     `/api/law?k=12&q=${encodeURIComponent(q)}`,
   );
   const context = found.chunks
@@ -338,7 +340,9 @@ export async function runLawGuide(question: string, language: string) {
     uncertain_reason: z.string().nullable().default(null),
     acts_used: z.array(z.object({ title: z.string(), year: z.number().nullable().default(null) })).default([]),
     legal_aid: z.object({ summary: z.string(), facts_given: z.array(z.string()).default([]), sections: z.array(z.string()).default([]), open_questions: z.array(z.string()).default([]) }).nullable().default(null),
+    official_sources: z.array(z.string()).default([]),
   });
+  const sourceList = OFFICIAL_SOURCES.map((o) => `${o.id}: ${o.name} (${o.url}) — ${o.topics.join("; ")}`).join("\n");
   const ans = (await runJsonAgent(
     "Nirdesh_LawGuide",
     Answer,
@@ -349,7 +353,9 @@ export async function runLawGuide(question: string, language: string) {
         `Acts in the knowledge base: ${found.documents.map((d) => `${d.title}${d.act_year ? ` (${d.act_year})` : ""}`).join("; ") || "NONE"}.\n` +
         `Use ONLY the sections below. If they do not answer the question, set uncertain=true and say the law is not in the knowledge base.\n` +
         `If uncertain is true, fill legal_aid (summary, facts_given, sections, open_questions); otherwise legal_aid is null.\n` +
-        `Reply as JSON: {"in_one_line","what_to_do":[3-5 steps],"law_says":[{"act","section","quote","chunk":"C#"}],"be_careful","uncertain","uncertain_reason","acts_used":[{"title","year"}],"legal_aid"}.\n\n` +
+        `In official_sources list the ids (1-3) of the official websites below where the user can read the relevant law or file — especially when the law is not in the knowledge base. Never invent a website.\n` +
+        `OFFICIAL SOURCES:\n${sourceList}\n\n` +
+        `Reply as JSON: {"in_one_line","what_to_do":[3-5 steps],"law_says":[{"act","section","quote","chunk":"C#"}],"be_careful","uncertain","uncertain_reason","acts_used":[{"title","year"}],"legal_aid","official_sources":[ids]}.\n\n` +
         `QUESTION: ${question}\n\nSECTIONS FROM THE KNOWLEDGE BASE:\n${context || "(none found)"}`,
       effort: "high",
     },

@@ -13,8 +13,11 @@ export async function GET(req: Request) {
     const q = url.searchParams.get("q") ?? "";
     const terms = keywords(q);
     const sb = db();
-    const docs = must(await sb.from("knowledge_documents").select("id, title, act_year, version_note, uploaded_at, assigned_skills"));
-    const lawDocs = docs.filter((d) => (d.assigned_skills as string[]).includes("know-your-law"));
+    // Only the active version of each Act is quoted; versions awaiting review are excluded.
+    const docs = must(await sb.from("knowledge_documents").select("*"));
+    const lawDocs = docs
+      .filter((d) => (d.assigned_skills as string[]).includes("know-your-law") && (d.status ?? "active") === "active")
+      .map((d) => ({ id: d.id, title: d.title, act_year: d.act_year, version_note: d.version_note, uploaded_at: d.uploaded_at, source_url: d.source_url ?? null }));
     if (!terms.length || !lawDocs.length) return Response.json({ chunks: [], documents: lawDocs });
 
     const tsq = terms.map((t) => t.replace(/[^a-z0-9]/g, "")).filter(Boolean).join(" | ");
