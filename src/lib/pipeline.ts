@@ -60,7 +60,11 @@ async function runJsonAgent<T>(agent: string, schema: ZodType<T>, args: CallArgs
       lastErr = e instanceof Error ? e.message.slice(0, 300) : "invalid";
     }
   }
-  throw new Error(`${agent} returned invalid output twice: ${lastErr}`);
+  console.warn(`${agent} invalid output:`, lastErr);
+  throw new Error(
+    `The AI model gave an answer in the wrong format twice, so Nirdesh did not use it. ` +
+      `Small free models often do this — in Settings choose a stronger model (for example openai/gpt-oss-120b:free on OpenRouter, Gemini 3.5 Flash, or Claude).`,
+  );
 }
 
 interface DirectionRow {
@@ -331,16 +335,21 @@ export async function runLawGuide(question: string, language: string) {
   const context = found.chunks
     .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
     .join("\n\n---\n\n");
+  // Lenient on shape (small models return a boolean or a single string where a list is expected),
+  // strict on content: quotes are still verified word for word against the Act afterwards.
+  const str = z.preprocess((v) => (v == null ? "" : typeof v === "string" ? v : Array.isArray(v) ? v.join("\n") : String(v)), z.string());
+  const strList = z.preprocess((v) => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]), z.array(z.string()));
+  const bool = z.preprocess((v) => (typeof v === "string" ? /^(true|yes)$/i.test(v.trim()) : Boolean(v)), z.boolean());
   const Answer = z.object({
-    in_one_line: z.string(),
-    what_to_do: z.array(z.string()).default([]),
-    law_says: z.array(z.object({ act: z.string(), section: z.string(), quote: z.string(), chunk: z.string() })).default([]),
-    be_careful: z.string().default(""),
-    uncertain: z.boolean(),
-    uncertain_reason: z.string().nullable().default(null),
-    acts_used: z.array(z.object({ title: z.string(), year: z.number().nullable().default(null) })).default([]),
-    legal_aid: z.object({ summary: z.string(), facts_given: z.array(z.string()).default([]), sections: z.array(z.string()).default([]), open_questions: z.array(z.string()).default([]) }).nullable().default(null),
-    official_sources: z.array(z.string()).default([]),
+    in_one_line: str,
+    what_to_do: strList.default([]),
+    law_says: z.preprocess((v) => (Array.isArray(v) ? v : []), z.array(z.object({ act: str, section: str, quote: str, chunk: str }))).default([]),
+    be_careful: str.default(""),
+    uncertain: bool,
+    uncertain_reason: z.preprocess((v) => (v == null || v === false ? null : String(v)), z.string().nullable()).default(null),
+    acts_used: z.preprocess((v) => (Array.isArray(v) ? v : []), z.array(z.object({ title: str, year: z.coerce.number().nullable().catch(null).default(null) }))).default([]),
+    legal_aid: z.preprocess((v) => (v && typeof v === "object" ? v : null), z.object({ summary: str, facts_given: strList.default([]), sections: strList.default([]), open_questions: strList.default([]) }).nullable()).default(null),
+    official_sources: strList.default([]),
   });
   const sourceList = OFFICIAL_SOURCES.map((o) => `${o.id}: ${o.name} (${o.url}) — ${o.topics.join("; ")}`).join("\n");
   const ans = (await runJsonAgent(
