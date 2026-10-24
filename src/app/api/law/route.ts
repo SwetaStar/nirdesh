@@ -20,22 +20,32 @@ export async function GET(req: Request) {
       .map((d) => ({ id: d.id, title: d.title, act_year: d.act_year, version_note: d.version_note, uploaded_at: d.uploaded_at, source_url: d.source_url ?? null }));
     if (!terms.length || !lawDocs.length) return Response.json({ chunks: [], documents: lawDocs });
 
-    const tsq = terms.map((t) => t.replace(/[^a-z0-9]/g, "")).filter(Boolean).join(" | ");
-    const rows = must(
-      await sb
-        .from("knowledge_chunks")
-        .select("id, document_id, section_ref, heading, content")
-        .in("document_id", lawDocs.map((d) => d.id))
-        .textSearch("tsv", tsq, { config: "english" })
-        .limit(80),
-    );
-    const scored = rows
+    const words = terms.map((t) => t.replace(/[^a-z0-9]/g, "")).filter(Boolean);
+    const ids = lawDocs.map((d) => d.id);
+    const query = (tsq: string, limit: number) =>
+      sb.from("knowledge_chunks").select("id, document_id, section_ref, heading, content").in("document_id", ids).textSearch("tsv", tsq, { config: "english" }).limit(limit);
+    // Sections containing ALL key words are the strongest candidates; a wide ANY-word pool fills the rest.
+    const [all, any] = await Promise.all([query(words.join(" & "), 60), query(words.join(" | "), 500)]);
+    const pool = new Map<string, { id: string; document_id: string; section_ref: string; heading: string; content: string }>();
+    for (const r of [...must(all), ...must(any)]) pool.set(r.id, r);
+    // Rank: distinct key words present (stem-tolerant), words in the section title, then how often they occur.
+    const stem = (w: string) => w.slice(0, Math.max(4, w.length - 2));
+    const scored = [...pool.values()]
       .map((r) => {
-        const hay = `${r.heading} ${r.content}`.toLowerCase();
-        const score = terms.reduce((s, t) => s + (hay.includes(t) ? 1 + (r.heading.toLowerCase().includes(t) ? 1 : 0) : 0), 0);
+        const head = r.heading.toLowerCase();
+        const body = r.content.toLowerCase();
+        let score = 0;
+        for (const w of words) {
+          const st = stem(w);
+          if (body.includes(st) || head.includes(st)) score += 3;
+          if (head.includes(st)) score += 4;
+          score += Math.min(3, body.split(st).length - 1) * 0.3;
+        }
+        // Index pages and very long fragments are rarely the best answer.
+        if (/arrangement of sections/i.test(r.section_ref)) score -= 5;
         return { ...r, score };
       })
-      .sort((a, b) => b.score - a.score)
+      .sort((x, y) => y.score - x.score)
       .slice(0, Number(url.searchParams.get("k") ?? 10));
     return Response.json({
       chunks: scored.map((c) => ({ ...c, document: lawDocs.find((d) => d.id === c.document_id) })),
