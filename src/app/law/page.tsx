@@ -128,7 +128,18 @@ export default function LawPage() {
           </div>
           <div className="rounded-2xl border-2 border-line bg-white p-5">
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">The law says</h3>
-            {a.law_says.length === 0 && (
+            {a.law_says.length === 0 && r.related.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-mist">Related sections found in Nirdesh&apos;s library (official text, unedited):</p>
+                {r.related.map((x, i) => (
+                  <div key={i}>
+                    <p className="text-sm font-semibold">{x.act} — {x.section}</p>
+                    <pre className="mt-1 max-h-60 overflow-auto rounded-lg bg-paper p-3 font-sans text-xs whitespace-pre-wrap">{x.text}</pre>
+                  </div>
+                ))}
+              </div>
+            )}
+            {a.law_says.length === 0 && r.related.length === 0 && (
               <p className="text-sm text-mist">
                 {r.notInLibrary
                   ? "This law is not in Nirdesh's library, so nothing is quoted. Read the official text using the links below."

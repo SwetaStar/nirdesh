@@ -1,6 +1,15 @@
 // Fixed answer used when the law library has nothing relevant. Written by people, not generated,
 // so Nirdesh never guesses about a law it cannot quote (handoff: "do NOT guess").
 
+// Used when the library has related sections but the AI's answer could not be verified against them.
+export const UNVERIFIED: Record<string, string> = {
+  English: "Nirdesh found related sections in its library (shown below), but could not confirm the AI's answer word for word against them, so the AI's answer is not shown.",
+  Hindi: "Nirdesh को अपनी लाइब्रेरी में संबंधित धाराएँ मिलीं (नीचे दी गई हैं), लेकिन AI के उत्तर की उनसे शब्दशः पुष्टि नहीं हो सकी, इसलिए AI का उत्तर नहीं दिखाया गया है।",
+  Kannada: "Nirdesh ತನ್ನ ಗ್ರಂಥಾಲಯದಲ್ಲಿ ಸಂಬಂಧಿತ ವಿಭಾಗಗಳನ್ನು ಕಂಡುಕೊಂಡಿದೆ (ಕೆಳಗೆ ತೋರಿಸಲಾಗಿದೆ), ಆದರೆ AI ಉತ್ತರವನ್ನು ಅವುಗಳೊಂದಿಗೆ ಪದಶಃ ದೃಢಪಡಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ, ಆದ್ದರಿಂದ AI ಉತ್ತರವನ್ನು ತೋರಿಸಲಾಗಿಲ್ಲ.",
+  Marathi: "Nirdesh ला त्याच्या ग्रंथालयात संबंधित कलमे सापडली (खाली दिली आहेत), पण AI च्या उत्तराची त्यांच्याशी शब्दशः खात्री करता आली नाही, म्हणून AI चे उत्तर दाखवलेले नाही.",
+  Telugu: "Nirdesh తన గ్రంథాలయంలో సంబంధిత విభాగాలను కనుగొంది (కింద చూపబడ్డాయి), కానీ AI సమాధానాన్ని వాటితో పదశః ధృవీకరించలేకపోయింది, కాబట్టి AI సమాధానం చూపబడలేదు.",
+};
+
 export const NOT_IN_LIBRARY: Record<string, { one: string; steps: string[]; careful: string; reason: string }> = {
   English: {
     one: "This law is not in Nirdesh's library yet, so Nirdesh will not guess an answer.",

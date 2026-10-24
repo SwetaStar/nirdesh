@@ -381,7 +381,7 @@ export async function runLawGuide(question: string, language: string) {
       method: "POST",
       json: { question, language, answer_layers: ans, acts_cited: [], uncertain: true, quotes: [], handoff: { summary: ans.legal_aid!.summary, sections: [], open_questions: ans.legal_aid!.open_questions } },
     }).catch(() => {});
-    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true, live: null };
+    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true, live: null, related: [] as { act: string; section: string; text: string }[] };
   }
   const context = found.chunks
     .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
@@ -420,11 +420,26 @@ export async function runLawGuide(question: string, language: string) {
   const keep = ans.law_says.map((_, i) => saved.quote_checks[i]?.verbatim === true);
   const removedQuotes = keep.filter((k) => !k).length;
   const shown: LawAnswer = { ...ans, law_says: ans.law_says.filter((_, i) => keep[i]) };
-  if (ans.law_says.length && !shown.law_says.length) {
+  // An answer is shown only if at least one of its quotations is verified word for word.
+  // Otherwise the AI's text is withheld and the user sees the library's own sections instead.
+  let related: { act: string; section: string; text: string }[] = [];
+  if (!shown.law_says.length) {
+    const { NOT_IN_LIBRARY, UNVERIFIED } = await import("@/lib/notInLibrary");
+    const t = NOT_IN_LIBRARY[language] ?? NOT_IN_LIBRARY.English;
+    shown.in_one_line = UNVERIFIED[language] ?? UNVERIFIED.English;
+    shown.what_to_do = t.steps;
+    shown.be_careful = t.careful;
     shown.uncertain = true;
-    shown.uncertain_reason = `${ans.uncertain_reason ? ans.uncertain_reason + " " : ""}The AI's quotations could not be found word for word in the uploaded Acts, so they are not shown.`;
+    shown.uncertain_reason = removedQuotes
+      ? "The AI's quotations could not be found word for word in the uploaded Acts."
+      : "The AI did not quote any section of the uploaded Acts.";
+    related = found.chunks.slice(0, 3).map((c) => ({
+      act: `${c.document.title}${c.document.act_year ? `, ${c.document.act_year}` : ""}`,
+      section: c.section_ref,
+      text: c.content.length > 1200 ? `${c.content.slice(0, 1200)}…` : c.content,
+    }));
   }
-  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false, live: null };
+  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false, live: null, related };
 }
 
 /** Know Your Law fallback: answer from official government websites only, clearly labelled as live search. */
@@ -465,5 +480,5 @@ async function runOfficialSearch(question: string, language: string, Answer: Zod
       handoff: ans.legal_aid ? { summary: ans.legal_aid.summary, sections: ans.legal_aid.sections, open_questions: ans.legal_aid.open_questions } : null,
     },
   }).catch(() => {});
-  return { answer: ans, quoteChecks: [] as { text: string; verbatim: boolean }[], sources: [] as LawChunk[], documents: [] as LawChunk["document"][], removedQuotes: 0, notInLibrary: false, live: { sources: uniq, model: `${r.provider}/${r.model}` } };
+  return { answer: ans, quoteChecks: [] as { text: string; verbatim: boolean }[], sources: [] as LawChunk[], documents: [] as LawChunk["document"][], removedQuotes: 0, notInLibrary: false, live: { sources: uniq, model: `${r.provider}/${r.model}` }, related: [] as { act: string; section: string; text: string }[] };
 }
