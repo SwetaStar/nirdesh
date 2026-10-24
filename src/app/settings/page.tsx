@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, RefreshCw, XCircle } from "lucide-react";
 import {
-  PROVIDERS, callModel, listModels, loadSettings, recommendedModel, saveSettings, type AISettings, type ProviderId,
+  PROVIDERS, callModel, candidateModels, listModels, loadSettings, recommendedModel, saveSettings, type AISettings, type ProviderId,
 } from "@/lib/ai/providers";
 import { PageHeader } from "@/components/Shell";
 
@@ -81,6 +81,24 @@ export default function SettingsPage() {
     } catch (e) {
       setTest({ state: "fail", msg: e instanceof Error ? e.message.slice(0, 300) : "Failed" });
     }
+  }
+
+  /** Try models one by one (no retries, tiny prompt) and keep the first that answers. */
+  async function findWorking() {
+    const tried: string[] = [];
+    for (const id of candidateModels(provider, models)) {
+      setTest({ state: "running", msg: `Trying ${id}…` });
+      try {
+        const r = await callModel({ system: "Reply with exactly: OK", user: "Say OK.", maxTokens: 2000, effort: "low", noRetry: true, modelOverride: id });
+        const cur = loadSettings();
+        update({ ...cur, model: { ...cur.model, [provider]: id } });
+        setTest({ state: "ok", msg: `Connected — ${id} replied in ${(r.durationMs / 1000).toFixed(1)}s. Saved as your model.` });
+        return;
+      } catch {
+        tried.push(id);
+      }
+    }
+    setTest({ state: "fail", msg: `None of these answered right now: ${tried.join(", ") || "no models loaded"}. The provider may be busy — try again in a few minutes, or use another provider.` });
   }
 
   return (
@@ -179,7 +197,13 @@ export default function SettingsPage() {
             {test.state === "running" && <Loader2 size={16} className="animate-spin" />} Test connection
           </button>
           {test.state === "ok" && <span className="flex items-center gap-1 text-sm text-emerald-700"><CheckCircle2 size={16} />{test.msg}</span>}
-          {test.state === "fail" && <span className="flex items-center gap-1 text-sm text-red-700"><XCircle size={16} />{test.msg}</span>}
+          {test.state === "running" && test.msg && <span className="text-sm text-mist">{test.msg}</span>}
+          {test.state === "fail" && (
+            <span className="flex flex-wrap items-center gap-2 text-sm text-red-700">
+              <XCircle size={16} />{test.msg}
+              {models.length > 1 && <button className="btn-ghost py-1" onClick={findWorking}>Find a working model</button>}
+            </span>
+          )}
           {key && (
             <button
               className="ml-auto text-sm text-muted underline"

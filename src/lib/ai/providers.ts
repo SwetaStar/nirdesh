@@ -140,24 +140,33 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
   }
 }
 
+/** Models to try, best first, when looking for one that answers (skips retired Gemini 1.x/2.x). */
+export function candidateModels(provider: ProviderId, models: { id: string }[]): string[] {
+  const ids = models.map((m) => m.id);
+  if (provider !== "gemini") return [...new Set([...PROVIDERS[provider].defaultModels.map((m) => m.id), ...ids])].slice(0, 8);
+  const current = ids.filter((id) => !/^gemini-(1|2)(\.|-)/.test(id));
+  const rank = (id: string) =>
+    (/^gemini-[\d.]+-flash$/.test(id) ? 0 : /^gemini-[\d.]+-flash-lite$/.test(id) ? 1 : /flash/.test(id) ? 2 : /pro/.test(id) ? 3 : 4);
+  return current.sort((a, b) => rank(a) - rank(b) || b.localeCompare(a)).slice(0, 8);
+}
+
 /** A sensible model to pre-select from a live list (stable "flash"-class text model where possible). */
 export function recommendedModel(provider: ProviderId, models: { id: string }[]): string | undefined {
   const ids = models.map((m) => m.id);
   if (provider === "gemini") {
-    const stable = ids.filter((id) => /^gemini-[\d.]+-flash$/.test(id)).sort().reverse();
-    return stable[0] ?? ids.find((id) => /flash/.test(id) && !/lite/.test(id)) ?? ids[0];
+    return candidateModels(provider, models)[0] ?? ids[0];
   }
   return PROVIDERS[provider].defaultModels[0]?.id ?? ids[0];
 }
 
-function openAICompatible(provider: "openai" | "groq" | "openrouter", key: string) {
+function openAICompatible(provider: "openai" | "groq" | "openrouter", key: string, noRetry = false) {
   const baseURL =
     provider === "groq"
       ? "https://api.groq.com/openai/v1"
       : provider === "openrouter"
         ? "https://openrouter.ai/api/v1"
         : undefined;
-  return new OpenAI({ apiKey: key, baseURL, dangerouslyAllowBrowser: true });
+  return new OpenAI({ apiKey: key, baseURL, dangerouslyAllowBrowser: true, maxRetries: noRetry ? 0 : 2 });
 }
 
 export interface CallArgs {
@@ -167,6 +176,10 @@ export interface CallArgs {
   json?: boolean;
   maxTokens?: number;
   effort?: "low" | "medium" | "high";
+  /** Skip automatic retries (used when probing which model works). */
+  noRetry?: boolean;
+  /** Use this model instead of the one saved in Settings. */
+  modelOverride?: string;
 }
 
 export interface CallResult {
@@ -203,7 +216,8 @@ export function friendlyError(e: unknown, label: string, model: string): Error {
 }
 
 export async function callModel(args: CallArgs): Promise<CallResult> {
-  const { model, info } = activeConfig();
+  const { info } = activeConfig();
+  const model = args.modelOverride ?? activeConfig().model;
   try {
     return await callModelRaw(args);
   } catch (e) {
@@ -214,7 +228,9 @@ export async function callModel(args: CallArgs): Promise<CallResult> {
 }
 
 async function callModelRaw(args: CallArgs): Promise<CallResult> {
-  const { provider, key, model, info } = activeConfig();
+  const cfg = activeConfig();
+  const { provider, key, info } = cfg;
+  const model = args.modelOverride ?? cfg.model;
   if (!key || !model) throw new Error("No AI key set. Open Settings and add a key.");
   if (args.pdfBase64 && !info.readsPdf)
     throw new Error(`${info.label} cannot read scanned PDFs. Switch to Claude or Gemini in Settings.`);
@@ -222,7 +238,7 @@ async function callModelRaw(args: CallArgs): Promise<CallResult> {
   let text = "";
 
   if (provider === "claude") {
-    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+    const client = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true, maxRetries: args.noRetry ? 0 : 2 });
     const content: Anthropic.ContentBlockParam[] = [];
     if (args.pdfBase64)
       content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: args.pdfBase64 } });
@@ -243,7 +259,7 @@ async function callModelRaw(args: CallArgs): Promise<CallResult> {
     // Retry when Google is busy (503) or rate-limiting (429): 4 attempts with growing waits.
     const ai = new GoogleGenAI({
       apiKey: key,
-      httpOptions: { retryOptions: { attempts: 4, initialDelay: 2, maxDelay: 20, httpStatusCodes: [408, 429, 500, 502, 503, 504] } },
+      httpOptions: { retryOptions: { attempts: args.noRetry ? 1 : 4, initialDelay: 2, maxDelay: 20, httpStatusCodes: [408, 429, 500, 502, 503, 504] } },
     });
     const parts: { text?: string; inlineData?: { mimeType: string; data: string } }[] = [];
     if (args.pdfBase64) parts.push({ inlineData: { mimeType: "application/pdf", data: args.pdfBase64 } });
@@ -259,7 +275,7 @@ async function callModelRaw(args: CallArgs): Promise<CallResult> {
     });
     text = res.text ?? "";
   } else {
-    const client = openAICompatible(provider, key);
+    const client = openAICompatible(provider, key, args.noRetry);
     const res = await client.chat.completions.create({
       model,
       max_completion_tokens: args.maxTokens ?? 16000,
