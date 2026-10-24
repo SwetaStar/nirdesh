@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { UploadBox } from "@/components/UploadBox";
 import { LANGUAGES } from "@/lib/pipeline";
+import { PageHeader } from "@/components/Shell";
 
 export default function CitizenPage() {
   const [lang, setLang] = useState(() => (typeof window === "undefined" ? "English" : localStorage.getItem("nirdesh.lang") ?? "English"));
@@ -11,18 +12,15 @@ export default function CitizenPage() {
     localStorage.setItem("nirdesh.lang", l);
   };
   return (
-    <div className="max-w-3xl space-y-8">
-      <div>
-        <h1>Understand your court order</h1>
-        <p className="mt-2 text-muted">Upload the order you won. Nirdesh will tell you, in simple words, what the government must do, by when, and what you can do.</p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader title="Understand your court order" subtitle={<>Upload the order you won. Nirdesh will tell you, in simple words, what the government must do, by when, and what you can do.</>} />
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">1. Choose your language</h2>
-        <div className="flex flex-wrap gap-3">
+        <h2>1. Choose your language</h2>
+        <div className="flex flex-wrap gap-2">
           {LANGUAGES.map((l) => (
             <button key={l.id} onClick={() => pick(l.id)}
-              className={`rounded-2xl border-2 px-5 py-3 text-lg ${lang === l.id ? "border-brand bg-brand-soft font-semibold text-brand" : "border-line bg-white"}`}>
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${lang === l.id ? "border-dusk bg-dusk text-paper-raised" : "border-mist-line bg-paper-raised text-ink-soft hover:bg-haze"}`}>
               {l.native}
             </button>
           ))}
@@ -30,7 +28,7 @@ export default function CitizenPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold">2. Upload your court order</h2>
+        <h2>2. Upload your court order</h2>
         <UploadBox role="citizen" />
       </section>
 

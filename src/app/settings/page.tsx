@@ -5,6 +5,7 @@ import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, RefreshC
 import {
   PROVIDERS, callModel, listModels, loadSettings, saveSettings, type AISettings, type ProviderId,
 } from "@/lib/ai/providers";
+import { PageHeader } from "@/components/Shell";
 
 export default function SettingsPage() {
   const [s, setS] = useState<AISettings | null>(null);
@@ -72,15 +73,12 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1>Settings</h1>
-        <p className="text-muted">Choose the AI that powers Nirdesh&apos;s agents.</p>
-      </div>
+      <PageHeader title="Settings" subtitle={<>Choose the AI that powers Nirdesh&apos;s agents.</>} />
 
-      <section className="card space-y-5 p-6">
+      <section className="card space-y-5 p-4">
         <div>
-          <h2 className="font-semibold">AI Provider</h2>
-          <p className="text-sm text-muted">
+          <h2 className="text-sm font-semibold">AI Provider</h2>
+          <p className="mt-1 text-xs text-mist">
             Your key is stored only in this browser and sent directly to the provider — never to the Nirdesh server.
           </p>
         </div>
@@ -213,11 +211,11 @@ function AILog() {
   }
 
   return (
-    <section className="card p-6">
+    <section className="card p-4">
       <button className="flex w-full items-center justify-between" onClick={() => { setOpen(!open); if (!calls) load(); }}>
         <div className="text-left">
-          <h2 className="font-semibold">AI activity log</h2>
-          <p className="text-sm text-muted">See exactly what each agent sent and got back. Every output is a live model call.</p>
+          <h2 className="text-sm font-semibold">AI activity log</h2>
+          <p className="mt-1 text-xs text-mist">See exactly what each agent sent and got back. Every output is a live model call.</p>
         </div>
         {open ? <ChevronDown /> : <ChevronRight />}
       </button>

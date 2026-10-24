@@ -79,21 +79,21 @@ export default function CitizenCase() {
   const words = explanation ? explanation.content.split(/\s+/).filter(Boolean).length : 0;
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="space-y-6">
       <CaseHeader b={b} />
       <Progress stage={stage} live={live} error={error} onRetry={run} />
 
       {stage === "no_directions" && (
-        <div className="card p-6 text-lg">
+        <div className="card p-4 text-sm">
           <p className="font-semibold">This order does not tell the government to do anything.</p>
-          <p className="mt-2 text-base text-muted">{b.order.extractor_notes}</p>
-          <p className="mt-2 text-base">If you think this is wrong, please show the order to your nearest District Legal Services Authority (free legal aid) or a lawyer.</p>
+          <p className="mt-2 text-sm text-mist">{b.order.extractor_notes}</p>
+          <p className="mt-2 text-sm">If you think this is wrong, please show the order to your nearest District Legal Services Authority (free legal aid) or a lawyer.</p>
         </div>
       )}
 
       {stage === "awaiting_gate" && (
         <>
-          <div className="card p-5 text-base">
+          <div className="notice">
             <b>Please check what we found.</b> For each item, choose <i>Approve</i> if it matches your order, <i>Correct</i> to fix it, or <i>Reject</i> if it is wrong. A legal-aid volunteer can help you with this step.
           </div>
           <Gate b={b} onDone={reload} />
@@ -102,17 +102,17 @@ export default function CitizenCase() {
 
       {(stage === "verified" || stage === "planned") && (
         <section className="space-y-5">
-          <div className="card space-y-4 p-6">
+          <div className="card space-y-4 p-4">
             <div className="flex flex-wrap gap-2">
               {LANGUAGES.map((l) => (
                 <button key={l.id} onClick={() => setLang(l.id)}
-                  className={`rounded-xl border-2 px-4 py-2 ${lang === l.id ? "border-brand bg-brand-soft font-semibold text-brand" : "border-line"}`}>
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${lang === l.id ? "border-dusk bg-dusk text-paper-raised" : "border-mist-line bg-paper-raised text-ink-soft hover:bg-haze"}`}>
                   {l.native}
                 </button>
               ))}
             </div>
-            <input className="input text-base" placeholder="Your question (optional) — e.g. When will I get my arrears?" value={question} onChange={(e) => setQuestion(e.target.value)} />
-            <button className="btn-primary px-6 py-3 text-base" disabled={busy} onClick={explain}>
+            <input className="input" placeholder="Your question (optional) — e.g. When will I get my arrears?" value={question} onChange={(e) => setQuestion(e.target.value)} />
+            <button className="btn-primary self-start" disabled={busy} onClick={explain}>
               {busy && <Loader2 size={18} className="animate-spin" />} {explanation ? "Explain again" : "Explain my order"}
             </button>
             <ErrorBox error={err} />
@@ -123,8 +123,8 @@ export default function CitizenCase() {
               <div className="grid gap-4">
                 {layers.map((l, i) => (
                   <div key={i} className={`rounded-2xl border-2 p-5 ${CARD_STYLES[i] ?? "border-line bg-white"}`}>
-                    {l.title && <h3 className="mb-2 text-lg font-semibold">{l.title}</h3>}
-                    <div className="text-base [&_.prose-nirdesh]:text-base"><Markdown>{l.body}</Markdown></div>
+                    {l.title && <h3 className="mb-1.5 text-sm font-semibold">{l.title}</h3>}
+                    <div><Markdown>{l.body}</Markdown></div>
                   </div>
                 ))}
               </div>
@@ -134,7 +134,7 @@ export default function CitizenCase() {
             </>
           )}
 
-          <button className="btn-ghost w-full py-4 text-base" onClick={() => download(`legal-aid-summary-${b.order.case_number ?? "case"}.md`, legalAidSummary(b, explanation?.content))}>
+          <button className="btn-ghost w-full" onClick={() => download(`legal-aid-summary-${b.order.case_number ?? "case"}.md`, legalAidSummary(b, explanation?.content))}>
             <Scale size={18} /> Prepare for legal aid <Download size={16} />
           </button>
         </section>

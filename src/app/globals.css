@@ -1,61 +1,93 @@
 @import "tailwindcss";
 
 @theme inline {
+  /* DayPilot's colour roles, re-tinted from orange to Nirdesh magenta / pink. */
+  --color-paper: #faf1f4;        /* page background (DayPilot: warm paper) */
+  --color-paper-raised: #ffffff; /* cards, sidebar */
+  --color-ink: #23131b;
+  --color-ink-soft: #5c4553;
+  --color-mist: #85707b;         /* secondary text */
+  --color-mist-line: #ecd5de;    /* borders */
+  --color-haze: #f6e3eb;         /* hover, notice boxes */
+  --color-blush: #f8c8d8;
+  --color-dusk: #c2185b;         /* primary accent (DayPilot: orange) */
+  --color-dusk-deep: #9c1249;
+  --color-dawn: #e0679a;         /* secondary accent (DayPilot: gold) */
+  --color-dawn-deep: #a0225f;
+  --color-danger: #c23616;
+  --color-danger-soft: #f7ded6;
+  --color-success: #3f7d46;
+  --color-success-soft: #dfe9d8;
+  --color-warning: #b7791f;
+  --color-warning-soft: #f6e6c4;
+  --color-plum: #7b1fa2;
+
+  /* Older names used across the app, mapped onto the roles above. */
   --color-brand: #c2185b;
   --color-brand-dark: #9c1249;
-  --color-brand-soft: #fce4ec;
-  --color-plum: #6a1b9a;
-  --color-lavender: #f6f0e4;
-  --color-ink: #1c1712;
-  --color-muted: #5b5147;
-  --color-line: #e3d8c3;
-  --color-cream: #fbf8f4;
+  --color-brand-soft: #fbe3ec;
+  --color-lavender: #faf1f4;
+  --color-muted: #85707b;
+  --color-line: #ecd5de;
+  --color-cream: #ffffff;
+
   --font-sans: var(--font-text), "Noto Sans", "Noto Sans Kannada", "Noto Sans Telugu", "Noto Sans Devanagari", system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, serif;
   --font-mono: var(--font-code), ui-monospace, monospace;
 }
 
 body {
-  background: var(--color-lavender);
+  background: var(--color-paper);
   color: var(--color-ink);
-  font-size: 16px;
 }
 
 @layer base {
-  /* Page titles: serif display, like DayPilot. Utilities on a heading still override. */
+  /* Same scale as DayPilot: 24px serif page titles, 18px section titles, 14px text. */
   h1 {
     font-family: var(--font-display);
-    font-size: 1.875rem;
+    font-size: 1.5rem;
     font-weight: 600;
     font-variation-settings: "opsz" 144;
-    line-height: 1.2;
+    line-height: 1.25;
+    color: var(--color-ink);
   }
   h2 {
     font-size: 1.125rem;
     font-weight: 600;
+    color: var(--color-ink);
   }
   h1 + p {
-    margin-top: 0.5rem;
+    margin-top: 0.25rem;
+    font-size: 0.875rem;
+    color: var(--color-mist);
   }
 }
 
 @utility card {
-  @apply rounded-2xl border border-line bg-white shadow-[0_1px_2px_rgba(31,27,45,0.04)];
+  @apply rounded-xl border border-mist-line bg-paper-raised;
 }
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
 }
 @utility btn-primary {
-  @apply btn bg-brand text-white hover:bg-brand-dark;
+  @apply btn bg-dusk text-paper-raised hover:bg-dusk-deep;
 }
 @utility btn-ghost {
-  @apply btn border border-line bg-white text-ink hover:border-brand hover:text-brand;
+  @apply btn border border-mist-line bg-paper-raised text-ink-soft hover:bg-haze hover:text-ink;
 }
 @utility input {
-  @apply w-full rounded-lg border border-line bg-cream px-3.5 py-2.5 text-sm outline-none placeholder:text-muted/80 focus:border-brand focus:bg-white focus:ring-2 focus:ring-brand-soft;
+  @apply w-full rounded-lg border border-mist-line bg-paper-raised px-3 py-2 text-sm text-ink placeholder:text-mist focus:border-dusk focus:outline-none;
 }
 @utility label {
-  @apply mb-1.5 block text-sm font-semibold text-ink;
+  @apply mb-1 block text-sm font-medium text-ink-soft;
+}
+/* DayPilot "New day — want me to plan it?" style notice box. */
+@utility notice {
+  @apply flex items-center justify-between gap-3 rounded-xl border border-mist-line bg-haze p-3 text-sm text-dusk-deep;
+}
+/* DayPilot dashed empty state. */
+@utility empty {
+  @apply rounded-xl border border-dashed border-mist-line bg-paper-raised p-6 text-center text-sm text-mist;
 }
 
 /* Rendered markdown from agents (plans, drafts, explanations). */
@@ -70,9 +102,9 @@ body {
 .prose-nirdesh p { @apply my-2; }
 .prose-nirdesh ul { @apply my-2 list-disc pl-5; }
 .prose-nirdesh ol { @apply my-2 list-decimal pl-5; }
-.prose-nirdesh blockquote { @apply my-2 border-l-4 border-brand-soft pl-3 italic text-muted; }
+.prose-nirdesh blockquote { @apply my-2 border-l-4 border-blush pl-3 italic text-ink-soft; }
 .prose-nirdesh table { @apply my-3 w-full border-collapse text-xs; }
-.prose-nirdesh th { @apply border border-line bg-lavender px-2 py-1 text-left font-semibold; }
+.prose-nirdesh th { @apply border border-mist-line bg-haze px-2 py-1 text-left font-semibold; }
 .prose-nirdesh td { @apply border border-line px-2 py-1 align-top; }
 .prose-nirdesh code { @apply rounded bg-lavender px-1; }
 

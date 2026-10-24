@@ -6,6 +6,7 @@ import { Activity, Loader2 } from "lucide-react";
 import { api, STAGE_LABEL } from "@/lib/pipeline";
 import { Countdown, CriticBadge, ErrorBox, StatusBadge } from "@/components/ui";
 import type { TaskStatus } from "@/lib/rules";
+import { PageHeader } from "@/components/Shell";
 
 interface Dir {
   id: string; label: string; summary: string | null; status: string; critic_result: string | null; human_decision: string | null;
@@ -103,15 +104,10 @@ export default function Dashboard() {
 
       {/* Main */}
       <div className="min-w-0 space-y-6">
-        <div>
-          <h1>Live compliance dashboard</h1>
-          <p className="text-muted">
-            {s.overdue > 0 ? `${s.overdue} direction(s) overdue. ` : "Nothing overdue. "}
-            {s.awaiting_gate > 0 ? `${s.awaiting_gate} awaiting verification.` : ""}
-          </p>
-        </div>
+        <PageHeader title="Live compliance dashboard" subtitle={<>{s.overdue > 0 ? `${s.overdue} direction(s) overdue. ` : "Nothing overdue. "}
+            {s.awaiting_gate > 0 ? `${s.awaiting_gate} awaiting verification.` : ""}</>} />
 
-        <section className="card p-5">
+        <section className="card p-4">
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
             {KPIS.map(([label, n, color]) => (
               <div key={label}><p className={`text-2xl font-semibold ${color}`}>{n}</p><p className="text-xs text-muted">{label}</p></div>
@@ -135,7 +131,7 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-          {lists[tab].length === 0 && <p className="card p-6 text-sm text-muted">Nothing here.</p>}
+          {lists[tab].length === 0 && <p className="card p-4 text-sm text-muted">Nothing here.</p>}
           {lists[tab].map((o) => (
             <Link key={o.id} href={`/officer/case/${o.id}`} className="card block p-4 hover:border-brand">
               <div className="flex flex-wrap items-center gap-3">
@@ -163,7 +159,7 @@ export default function Dashboard() {
           ))}
         </section>
 
-        <section className="card p-5">
+        <section className="card p-4">
           <h2 className="mb-2 font-semibold">Systemic issues</h2>
           {data.issues.length === 0 ? (
             <p className="text-sm text-muted">None yet. When 3 or more judgments contain similar directions, Nirdesh flags a systemic issue and drafts a policy note.</p>

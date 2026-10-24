@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BookOpen, Gavel, ShieldCheck, Users } from "lucide-react";
+import { PageHeader } from "@/components/Shell";
 
 const DOORS = [
   {
@@ -27,31 +28,32 @@ const DOORS = [
 
 export default function Home() {
   return (
-    <div className="space-y-10">
-      <section className="space-y-3">
-        <p className="text-sm font-semibold tracking-widest text-brand uppercase">Nirdesh · निर्देश · direction</p>
-        <h1 className="max-w-3xl text-3xl leading-tight md:text-4xl">
-          When a court orders the government to act, Nirdesh makes sure it gets done on time — and that the citizen who won knows their rights.
-        </h1>
-        <p className="flex items-center gap-2 text-muted">
-          <ShieldCheck size={18} className="text-brand" /> The AI reads, checks, reminds and drafts. Humans decide.
-        </p>
-      </section>
+    <div>
+      <PageHeader title="Welcome" subtitle="Nirdesh · निर्देश · direction" />
 
-      <section className="grid gap-5 md:grid-cols-3">
+      <p className="max-w-2xl font-display text-[28px] leading-tight text-ink [font-variation-settings:'opsz'_144]">
+        Court orders, <span className="text-dusk italic">actually</span> done on time — and citizens who know their rights.
+      </p>
+      <p className="mt-2 flex items-center gap-1.5 text-sm text-mist">
+        <ShieldCheck className="h-4 w-4 text-dusk" /> The AI reads, checks, reminds and drafts. Humans decide.
+      </p>
+
+      <h2 className="mt-8">Where would you like to start?</h2>
+      <p className="mt-0.5 text-xs text-mist">Choose one. You can switch any time from the sidebar.</p>
+      <section className="mt-4 grid gap-3 md:grid-cols-3">
         {DOORS.map(({ href, icon: Icon, title, body, cta }) => (
-          <Link key={href} href={href} className="card group flex flex-col gap-4 p-6 transition hover:-translate-y-0.5 hover:border-brand">
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand">
-              <Icon size={22} />
+          <Link key={href} href={href} className="card group flex flex-col p-4 transition-colors hover:border-dusk">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-haze text-dusk">
+              <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
             </span>
-            <h2>{title}</h2>
-            <p className="flex-1 text-sm text-muted">{body}</p>
-            <span className="btn-primary self-start">{cta}</span>
+            <p className="mt-3 text-sm font-semibold text-ink">{title}</p>
+            <p className="mt-1.5 flex-1 text-sm text-ink-soft">{body}</p>
+            <span className="mt-4 self-start rounded-lg bg-dusk px-4 py-2 text-sm font-medium text-paper-raised group-hover:bg-dusk-deep">{cta}</span>
           </Link>
         ))}
       </section>
 
-      <p className="text-xs text-muted">
+      <p className="mt-8 text-xs text-mist">
         Nirdesh gives general information, not legal advice. It never files anything, never decides whether to appeal, and never states an action was taken unless you confirm it.
       </p>
     </div>

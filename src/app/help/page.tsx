@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { STATUS_META } from "@/lib/rules";
+import { PageHeader } from "@/components/Shell";
 
 const EVIDENCE = [
   {
@@ -71,12 +72,9 @@ function H2({ children }: { children: React.ReactNode }) {
 export default function HelpPage() {
   return (
     <div className="space-y-6">
-      <div>
-        <h1>Help &amp; About</h1>
-        <p className="text-muted">What Nirdesh does, why it exists, and how to use it.</p>
-      </div>
+      <PageHeader title="Help & About" subtitle={<>What Nirdesh does, why it exists, and how to use it.</>} />
 
-      <section className="card p-6">
+      <section className="card p-4">
         <H2>The problem</H2>
         <p className="text-sm leading-relaxed">
           A retired teacher wins a High Court case. Paragraph 47 of a 30-page judgment says: <i>&ldquo;The department is directed to
@@ -98,7 +96,7 @@ export default function HelpPage() {
         </ul>
       </section>
 
-      <section className="card p-6">
+      <section className="card p-4">
         <H2>How to use it</H2>
         <ol className="list-decimal space-y-2 pl-5 text-sm">
           <li><b>Add your AI key</b> in <Link href="/settings" className="text-brand underline">Settings</Link>. It stays in your browser and goes directly to the provider. Gemini offers a free key.</li>
@@ -109,7 +107,7 @@ export default function HelpPage() {
         </ol>
       </section>
 
-      <section className="card overflow-x-auto p-6">
+      <section className="card overflow-x-auto p-4">
         <H2>Deadline statuses</H2>
         <table className="w-full text-left text-sm">
           <thead className="bg-lavender"><tr><th className="px-3 py-2">Status</th><th className="px-3 py-2">Meaning</th><th className="px-3 py-2">What to do</th></tr></thead>
@@ -132,7 +130,7 @@ export default function HelpPage() {
         </table>
       </section>
 
-      <section className="card overflow-x-auto p-6">
+      <section className="card overflow-x-auto p-4">
         <H2>Nirdesh and legal aid</H2>
         <p className="mb-3 text-sm text-muted">Nirdesh complements legal-aid clinics and District Legal Services Authorities — it is the front door to legal aid, not a replacement.</p>
         <table className="w-full text-left text-sm">
@@ -145,12 +143,12 @@ export default function HelpPage() {
         </table>
       </section>
 
-      <section className="card p-6">
+      <section className="card p-4">
         <H2>Rules Nirdesh always follows</H2>
         <ul className="list-disc space-y-1 pl-5 text-sm">{RULES.map((r) => <li key={r}>{r}</li>)}</ul>
       </section>
 
-      <section className="card p-6">
+      <section className="card p-4">
         <H2>Privacy and limitations</H2>
         <ul className="list-disc space-y-1 pl-5 text-sm">
           <li>Your AI key is stored only in your browser and sent directly to the provider you choose. It never reaches the Nirdesh server.</li>
@@ -161,7 +159,7 @@ export default function HelpPage() {
         </ul>
       </section>
 
-      <section className="card overflow-x-auto p-6">
+      <section className="card overflow-x-auto p-4">
         <H2>Glossary</H2>
         <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-[12rem_1fr]">
           {GLOSSARY.map(([t, d]) => (

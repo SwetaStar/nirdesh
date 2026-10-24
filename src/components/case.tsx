@@ -83,9 +83,9 @@ export function useCase(id: string) {
 export function CaseHeader({ b }: { b: Bundle }) {
   const o = b.order;
   return (
-    <div className="card p-6">
+    <div className="card p-4">
       <p className="text-xs tracking-wide text-muted uppercase">{o.court ?? "Court"}</p>
-      <h1 className="text-2xl">{o.case_number ?? o.file_name}</h1>
+      <h1>{o.case_number ?? o.file_name}</h1>
       <p className="mt-1 text-sm text-muted">
         {o.petitioners && <>{o.petitioners} <span className="mx-1">vs</span> {o.respondents}</>}
         {o.judgment_date && <> · Judgment dated {o.judgment_date}</>}
@@ -101,7 +101,7 @@ export function CaseHeader({ b }: { b: Bundle }) {
 export function Progress({ stage, live, error, onRetry }: { stage: string; live: string | null; error: string | null; onRetry: () => void }) {
   const current = STEPS.findIndex((s) => s.match.includes(stage));
   return (
-    <div className="card space-y-4 p-5">
+    <div className="card space-y-4 p-4">
       <ol className="flex flex-wrap gap-2">
         {STEPS.map((s, i) => (
           <li key={s.key} className={`flex items-center gap-2 rounded-full px-3 py-1 text-sm ${i < current ? "bg-emerald-50 text-emerald-800" : i === current ? "bg-brand text-white" : "bg-lavender text-muted"}`}>
@@ -159,7 +159,7 @@ export function Gate({ b, onDone }: { b: Bundle; onDone: () => void }) {
   }
 
   return (
-    <section className="card space-y-4 p-6">
+    <section className="card space-y-4 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Verification gate</h2>
@@ -300,7 +300,7 @@ export function DirectionCard({ d, tasks, onChange }: { d: Direction; tasks: Bun
 
 export function AuditTrail({ b }: { b: Bundle }) {
   return (
-    <section className="card overflow-x-auto p-6">
+    <section className="card overflow-x-auto p-4">
       <h2 className="mb-1 text-lg font-semibold">Audit trail</h2>
       <p className="mb-3 text-sm text-muted">What the AI extracted, what the critic said, and what the human decided — kept separately, never overwritten.</p>
       <table className="w-full text-left text-xs">

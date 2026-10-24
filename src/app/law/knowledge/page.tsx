@@ -6,6 +6,7 @@ import { api, runAgent } from "@/lib/pipeline";
 import { activeConfig } from "@/lib/ai/providers";
 import { chunkAct, type Chunk } from "@/lib/chunk";
 import { ErrorBox } from "@/components/ui";
+import { PageHeader } from "@/components/Shell";
 
 interface Doc {
   id: string; title: string; type: string; act_year: number | null; version_note: string | null; uploaded_at: string;
@@ -148,13 +149,10 @@ export default function KnowledgePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1>Law library</h1>
-        <p className="text-muted">Bare Acts and Rules that LawGuide may quote. Upload the official text (e.g. from India Code). Nirdesh never invents legal text.</p>
-      </div>
+      <PageHeader title="Law library" subtitle={<>Bare Acts and Rules that LawGuide may quote. Upload the official text (e.g. from India Code). Nirdesh never invents legal text.</>} />
 
       {pending.length > 0 && (
-        <section className="card space-y-3 border-amber-300 p-6">
+        <section className="card space-y-3 border-amber-300 p-4">
           <h2 className="font-semibold text-amber-900">New versions waiting for review ({pending.length})</h2>
           <p className="text-sm text-muted">The nightly check found a changed file on the official site. It is <b>not</b> used in answers until a person approves it. The current version stays in use meanwhile.</p>
           {pending.map((d) => {
@@ -173,7 +171,7 @@ export default function KnowledgePage() {
         </section>
       )}
 
-      <section className="card space-y-4 p-6">
+      <section className="card space-y-4 p-4">
         <h2 className="font-semibold">Add an Act or Rules</h2>
         <div className="grid gap-3 sm:grid-cols-4">
           <input className="input sm:col-span-2" placeholder="Title, e.g. Foreign Contribution (Regulation) Act" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
@@ -203,7 +201,7 @@ export default function KnowledgePage() {
         <ErrorBox error={error} />
       </section>
 
-      <section className="card overflow-x-auto p-6">
+      <section className="card overflow-x-auto p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold">In the library</h2>
           <a href={SYNC_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-muted hover:text-brand">

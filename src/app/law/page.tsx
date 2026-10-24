@@ -8,6 +8,7 @@ import { isConfigured } from "@/lib/ai/providers";
 import { ErrorBox, download } from "@/components/ui";
 import { SourceChip, SourcesPanel } from "@/components/Sources";
 import { OFFICIAL_SOURCES, sourcesFor, type OfficialSource } from "@/lib/sources";
+import { PageHeader } from "@/components/Shell";
 
 type Result = Awaited<ReturnType<typeof runLawGuide>>;
 
@@ -78,23 +79,21 @@ export default function LawPage() {
 
   const a = r?.answer;
   return (
-    <div className="max-w-4xl space-y-6">
-      <div className="space-y-3">
-        <h1>Know Your Law</h1>
-        <p className="text-muted">Ask about an Act, a Rule or a filing in plain words. No upload needed.</p>
-        <Link href="/law/knowledge" className="btn-ghost"><Library size={16} /> Acts in the library</Link>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Know Your Law" subtitle={<>Ask about an Act, a Rule or a filing in plain words. No upload needed.</>}>
+        <div className="mt-3"><Link href="/law/knowledge" className="btn-ghost"><Library size={16} /> Acts in the library</Link></div>
+      </PageHeader>
 
-      <section className="card space-y-4 p-6">
+      <section className="card space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
           {LANGUAGES.map((l) => (
             <button key={l.id} onClick={() => setLang(l.id)}
-              className={`rounded-xl border-2 px-4 py-2 ${lang === l.id ? "border-brand bg-brand-soft font-semibold text-brand" : "border-line"}`}>{l.native}</button>
+              className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${lang === l.id ? "border-dusk bg-dusk text-paper-raised" : "border-mist-line bg-paper-raised text-ink-soft hover:bg-haze"}`}>{l.native}</button>
           ))}
         </div>
-        <textarea className="input min-h-28 text-base" value={question} onChange={(e) => setQuestion(e.target.value)}
+        <textarea className="input min-h-24" value={question} onChange={(e) => setQuestion(e.target.value)}
           placeholder="e.g. I work at IIM Visakhapatnam. Am I a government servant for the purpose of being a trustee in an NGO applying for FCRA registration?" />
-        <button className="btn-primary px-6 py-3 text-base" disabled={busy || question.trim().length < 8} onClick={ask}>
+        <button className="btn-primary" disabled={busy || question.trim().length < 8} onClick={ask}>
           {busy && <Loader2 size={18} className="animate-spin" />} {busy ? "Reading the law…" : "Ask"}
         </button>
         <ErrorBox error={error} />
@@ -113,11 +112,11 @@ export default function LawPage() {
           )}
           <div className="rounded-2xl border-2 border-brand bg-brand-soft p-5">
             <h3 className="mb-1 text-sm font-semibold tracking-wide text-brand uppercase">In one line</h3>
-            <p className="text-lg">{a.in_one_line}</p>
+            <p className="text-sm font-medium text-ink">{a.in_one_line}</p>
           </div>
           <div className="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-5">
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-emerald-800 uppercase">What you should do</h3>
-            <ol className="list-decimal space-y-1 pl-5 text-base">{a.what_to_do.map((s, i) => <li key={i}>{s}</li>)}</ol>
+            <ol className="list-decimal space-y-1 pl-5 text-sm">{a.what_to_do.map((s, i) => <li key={i}>{s}</li>)}</ol>
           </div>
           <div className="rounded-2xl border-2 border-line bg-white p-5">
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">The law says</h3>
@@ -140,7 +139,7 @@ export default function LawPage() {
           </div>
           <div className="rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-amber-800 uppercase">Be careful</h3>
-            <p className="text-base whitespace-pre-line">{a.be_careful}</p>
+            <p className="text-sm whitespace-pre-line">{a.be_careful}</p>
           </div>
 
           {answerSources(asked, a).length > 0 && (
@@ -150,7 +149,7 @@ export default function LawPage() {
             </div>
           )}
 
-          <button className={`w-full py-4 text-base ${a.uncertain ? "btn-primary" : "btn-ghost"}`} onClick={() => download("legal-aid-question.md", handoffMarkdown(asked, a, r))}>
+          <button className={`w-full ${a.uncertain ? "btn-primary" : "btn-ghost"}`} onClick={() => download("legal-aid-question.md", handoffMarkdown(asked, a, r))}>
             <Scale size={18} /> Prepare for legal aid <Download size={16} />
           </button>
 

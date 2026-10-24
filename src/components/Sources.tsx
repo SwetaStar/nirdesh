@@ -45,11 +45,11 @@ export function SourcesPanel({ defaultOpen = false }: { defaultOpen?: boolean })
   const [open, setOpen] = useState(defaultOpen);
   const groups = [...new Set(OFFICIAL_SOURCES.map((s) => s.group))];
   return (
-    <section className="card p-5">
+    <section className="card p-4">
       <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen(!open)}>
         <span>
-          <span className="block text-lg font-semibold">Official government sources</span>
-          <span className="text-sm text-muted">Where to read the official text yourself — {OFFICIAL_SOURCES.length} sites. Links open the government website.</span>
+          <span className="block text-sm font-semibold text-ink">Official government sources</span>
+          <span className="mt-1 block text-xs text-mist">Where to read the official text yourself — {OFFICIAL_SOURCES.length} sites. Links open the government website.</span>
         </span>
         {open ? <ChevronDown /> : <ChevronRight />}
       </button>

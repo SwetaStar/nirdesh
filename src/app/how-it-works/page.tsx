@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/Shell";
 const SKILLS = [
   "User intake & routing", "Direction extraction", "Extraction verification", "Verification gate (human)",
   "Compliance planning & drafting", "Citizen explainer", "Policy insights", "Live compliance dashboard", "Know Your Law",
@@ -32,10 +33,7 @@ export default function HowItWorks() {
   const outer = ring(AGENTS.length, 255, -54);
   return (
     <div className="space-y-6">
-      <div>
-        <h1>How Nirdesh works</h1>
-        <p className="text-muted">One orchestrator coordinates 9 skills that call 5 specialist agents. The orchestrator is code (a state machine), not a free-form AI router — so the human gate can never be skipped.</p>
-      </div>
+      <PageHeader title="How Nirdesh works" subtitle={<>One orchestrator coordinates 9 skills that call 5 specialist agents. The orchestrator is code (a state machine), not a free-form AI router — so the human gate can never be skipped.</>} />
 
       <section className="card overflow-x-auto p-4">
         <svg viewBox="0 0 600 600" className="mx-auto w-full max-w-2xl" role="img" aria-label="Nirdesh orchestrator, skills and agents">
@@ -69,7 +67,7 @@ export default function HowItWorks() {
         </p>
       </section>
 
-      <section className="card p-6">
+      <section className="card p-4">
         <h2 className="mb-4 text-lg font-semibold">What happens to a judgment</h2>
         <ol className="grid gap-3 md:grid-cols-3">
           {PIPELINE.map(([t, d], i) => (
@@ -82,7 +80,7 @@ export default function HowItWorks() {
         </ol>
       </section>
 
-      <section className="card p-6">
+      <section className="card p-4">
         <h2 className="mb-4 text-lg font-semibold">The agents</h2>
         <ul className="grid gap-3 md:grid-cols-2">
           {AGENTS.map((a) => <li key={a.name} className="rounded-2xl border border-line p-4"><p className="font-semibold">{a.name}</p><p className="text-sm text-muted">{a.role}</p></li>)}

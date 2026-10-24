@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { api, STAGE_LABEL } from "@/lib/pipeline";
 import { ErrorBox } from "@/components/ui";
 import { UploadBox } from "@/components/UploadBox";
+import { PageHeader } from "@/components/Shell";
 
 interface OrderRow {
   id: string; case_number: string | null; court: string | null; file_name: string; pipeline_stage: string;
@@ -22,12 +23,7 @@ export default function OfficerPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1>Process a judgment</h1>
-        <p className="text-muted">
-          Extractor → Critic (up to 2 correction rounds) → <b>your verification</b> → compliance plan and drafts.
-        </p>
-      </div>
+      <PageHeader title="Process a judgment" subtitle={<>Extractor → Critic (up to 2 correction rounds) → <b>your verification</b> → compliance plan and drafts.</>} />
       <UploadBox role="officer" />
 
       <section className="space-y-3">
