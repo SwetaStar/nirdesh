@@ -7,7 +7,7 @@
 
 import type { ZodType } from "zod";
 import { callModel, extractJson, type CallArgs } from "@/lib/ai/providers";
-import { CITIZEN_PROMPT, CRITIC_PROMPT, EXTRACTOR_PROMPT, PLANNER_PROMPT } from "@/lib/ai/prompts";
+import { CITIZEN_PROMPT, CRITIC_PROMPT, EXTRACTOR_PROMPT, LAWGUIDE_PROMPT, PLANNER_PROMPT } from "@/lib/ai/prompts";
 import { CriticOutput, ExtractorOutput } from "@/lib/schemas";
 import { CORRECTION_ROUNDS } from "@/lib/rules";
 
@@ -288,4 +288,83 @@ export async function runExplainer(orderId: string, language: string, question?:
   );
   await api("/api/drafts", { method: "POST", json: { type: "citizen_explanation", content: text, court_order_id: orderId, language, model_used: model } });
   return text;
+}
+
+export interface LawAnswer {
+  in_one_line: string;
+  what_to_do: string[];
+  law_says: { act: string; section: string; quote: string; chunk: string }[];
+  be_careful: string;
+  uncertain: boolean;
+  uncertain_reason: string | null;
+  acts_used: { title: string; year: number | null }[];
+  legal_aid: { summary: string; facts_given: string[]; sections: string[]; open_questions: string[] } | null;
+}
+
+interface LawChunk {
+  id: string; section_ref: string; heading: string; content: string;
+  document: { title: string; act_year: number | null; version_note: string | null; uploaded_at: string };
+}
+
+/** Know Your Law: search terms -> keyword retrieval -> LawGuide four-layer answer -> code checks quotes. */
+export async function runLawGuide(question: string, language: string) {
+  const { z } = await import("zod");
+  await logSkill("know-your-law", "started", question.slice(0, 80));
+  const Terms = z.object({ terms: z.array(z.string()).default([]) });
+  const t = await runJsonAgent(
+    "Nirdesh_LawGuide (search terms)",
+    Terms,
+    {
+      system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
+      user: question,
+      effort: "low",
+      maxTokens: 4000,
+    },
+    "00000000-0000-0000-0000-000000000000",
+  ).catch(() => ({ terms: [] as string[] }));
+  const q = [question, ...t.terms].join(" ");
+  const found = await api<{ chunks: LawChunk[]; documents: { title: string; act_year: number | null; version_note: string | null; uploaded_at: string }[] }>(
+    `/api/law?k=12&q=${encodeURIComponent(q)}`,
+  );
+  const context = found.chunks
+    .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
+    .join("\n\n---\n\n");
+  const Answer = z.object({
+    in_one_line: z.string(),
+    what_to_do: z.array(z.string()).default([]),
+    law_says: z.array(z.object({ act: z.string(), section: z.string(), quote: z.string(), chunk: z.string() })).default([]),
+    be_careful: z.string().default(""),
+    uncertain: z.boolean(),
+    uncertain_reason: z.string().nullable().default(null),
+    acts_used: z.array(z.object({ title: z.string(), year: z.number().nullable().default(null) })).default([]),
+    legal_aid: z.object({ summary: z.string(), facts_given: z.array(z.string()).default([]), sections: z.array(z.string()).default([]), open_questions: z.array(z.string()).default([]) }).nullable().default(null),
+  });
+  const ans = (await runJsonAgent(
+    "Nirdesh_LawGuide",
+    Answer,
+    {
+      system: LAWGUIDE_PROMPT,
+      user:
+        `User's language: ${language}. Write every field in ${language} EXCEPT "quote", which must be copied exactly from the source text.\n` +
+        `Acts in the knowledge base: ${found.documents.map((d) => `${d.title}${d.act_year ? ` (${d.act_year})` : ""}`).join("; ") || "NONE"}.\n` +
+        `Use ONLY the sections below. If they do not answer the question, set uncertain=true and say the law is not in the knowledge base.\n` +
+        `If uncertain is true, fill legal_aid (summary, facts_given, sections, open_questions); otherwise legal_aid is null.\n` +
+        `Reply as JSON: {"in_one_line","what_to_do":[3-5 steps],"law_says":[{"act","section","quote","chunk":"C#"}],"be_careful","uncertain","uncertain_reason","acts_used":[{"title","year"}],"legal_aid"}.\n\n` +
+        `QUESTION: ${question}\n\nSECTIONS FROM THE KNOWLEDGE BASE:\n${context || "(none found)"}`,
+      effort: "high",
+    },
+    "00000000-0000-0000-0000-000000000000",
+  )) as LawAnswer;
+  const quotes = ans.law_says.map((l) => {
+    const n = Number(l.chunk.replace(/\D/g, "")) - 1;
+    return { text: l.quote, chunk_ids: found.chunks[n] ? [found.chunks[n].id] : found.chunks.map((c) => c.id) };
+  });
+  const saved = await api<{ id: string; quote_checks: { text: string; verbatim: boolean }[] }>("/api/law", {
+    method: "POST",
+    json: {
+      question, language, answer_layers: ans, acts_cited: ans.acts_used, uncertain: ans.uncertain, quotes,
+      handoff: ans.legal_aid ? { summary: ans.legal_aid.summary, sections: ans.legal_aid.sections, open_questions: ans.legal_aid.open_questions } : null,
+    },
+  });
+  return { answer: ans, quoteChecks: saved.quote_checks, sources: found.chunks, documents: found.documents };
 }
