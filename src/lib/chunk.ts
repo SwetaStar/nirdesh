@@ -54,8 +54,13 @@ export function chunkAct(text: string): Chunk[] {
 }
 
 const STOP = new Set(
-  "a an the of to in on for and or is are was be by with as at from that this it i my me we our you your can do does should what when how who which whom am under any if not no".split(" "),
+  ("a an the of to in on for and or is are was were be been being by with as at from that this these those it its i my me mine we our us " +
+    "you your he she his her they them their can could do does did should would will shall may might must what when where why how who which " +
+    "whom am under any if not no yes also going go come comes coming get got there here then than so such very just about into over some " +
+    "issue issues problem problems question questions please tell know want need like one two any anything something someone person people " +
+    "up out am is being been has have had").split(" "),
 );
+/** Content words of a question (order kept), at most 20, so later words like "government" are not dropped. */
 export function keywords(q: string): string[] {
-  return [...new Set(q.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)))].slice(0, 12);
+  return [...new Set(q.toLowerCase().replace(/[^a-z0-9\s-]/g, " ").split(/\s+/).filter((w) => w.length > 2 && !STOP.has(w)))].slice(0, 20);
 }
