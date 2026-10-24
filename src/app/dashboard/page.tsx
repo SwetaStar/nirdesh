@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("needs");
+  const [allActivity, setAllActivity] = useState(false);
 
   const load = useCallback(() => api<Data>("/api/dashboard").then(setData).catch((e) => setError(e.message)), []);
   useEffect(() => {
@@ -87,7 +88,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[14rem_1fr_16rem]">
+    <div className="grid gap-6 xl:grid-cols-[14rem_1fr]">
       {/* Left: orchestrator skills */}
       <aside className="card h-fit p-4">
         <h2 className="mb-3 text-sm font-semibold">Orchestrator skills</h2>
@@ -175,14 +176,12 @@ export default function Dashboard() {
             </ul>
           )}
         </section>
-      </div>
 
-      {/* Right: live activity feed */}
-      <aside className="card h-fit min-w-0 overflow-hidden p-4">
-        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold"><Activity size={16} className="text-brand" /> Live activity</h2>
+        <section className="card min-w-0 overflow-hidden p-4">
+          <h2 className="mb-3 flex items-center gap-2 text-lg font-semibold"><Activity size={18} className="text-brand" /> Live activity</h2>
         {data.activity.length === 0 && <p className="text-xs text-muted">No activity yet.</p>}
-        <ul className="space-y-3">
-          {data.activity.map((a) => (
+        <ul className="grid gap-x-6 gap-y-3 md:grid-cols-2">
+          {(allActivity ? data.activity : data.activity.slice(0, 12)).map((a) => (
             <li key={a.id} className="min-w-0 text-xs">
               <p className="flex items-center gap-1">
                 <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${a.event === "failed" ? "bg-red-500" : a.event === "completed" ? "bg-emerald-500" : "bg-amber-500"}`} />
@@ -195,7 +194,14 @@ export default function Dashboard() {
             </li>
           ))}
         </ul>
-      </aside>
+        {data.activity.length > 12 && (
+          <button className="mt-3 text-xs font-medium text-dusk underline" onClick={() => setAllActivity(!allActivity)}>
+            {allActivity ? "Show less" : `Show more (${data.activity.length - 12})`}
+          </button>
+        )}
+        </section>
+      </div>
+
     </div>
   );
 }
