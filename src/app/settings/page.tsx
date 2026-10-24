@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, RefreshCw, XCircle } from "lucide-react";
 import {
-  PROVIDERS, callModel, candidateModels, listModels, loadSettings, recommendedModel, saveSettings, type AISettings, type ProviderId,
+  PROVIDERS, TINY_MODEL, callModel, candidateModels, listModels, loadSettings, recommendedModel, saveSettings, type AISettings, type ProviderId,
 } from "@/lib/ai/providers";
 import { PageHeader } from "@/components/Shell";
 
@@ -190,6 +190,12 @@ export default function SettingsPage() {
           {modelErr && <p className="mt-1 text-xs text-red-700">{modelErr}</p>}
         </div>
 
+        {TINY_MODEL.test(model) && (
+          <div className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
+            <b>{model}</b> is a very small model. It often invents legal text and breaks Nirdesh&apos;s answer format.
+            Choose a larger one (for example <code>openai/gpt-oss-120b:free</code>).{" "}<button className="underline" onClick={findWorking}>Find a working model</button>
+          </div>
+        )}
         <p className="text-sm text-muted">{info.note}</p>
 
         <div className="flex flex-wrap items-center gap-3">

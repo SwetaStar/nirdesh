@@ -140,14 +140,16 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
   }
 }
 
+/** Very small models cannot follow Nirdesh's output format or reason over long legal text. */
+export const TINY_MODEL = /(^|[-_/.])([0-4](\.\d+)?b)([-_:.]|$)|nano|tiny|lfm/i;
+
 /** Models to try, best first, when looking for one that answers (skips retired Gemini 1.x/2.x). */
 export function candidateModels(provider: ProviderId, models: { id: string }[]): string[] {
   const ids = models.map((m) => m.id);
   if (provider === "openrouter") {
     // Without credit only ":free" models work; prefer the strongest open models.
     // Tiny models (1-4B parameters, "nano"/"tiny", LFM) cannot follow Nirdesh's output format reliably.
-    const tiny = /(^|[-_/.])([0-4](\.\d+)?b)([-_:.]|$)|nano|tiny|lfm/i;
-    const free = ids.filter((id) => id.endsWith(":free") && !tiny.test(id));
+    const free = ids.filter((id) => id.endsWith(":free") && !TINY_MODEL.test(id));
     const pref = ["gpt-oss-120b", "deepseek", "qwen3", "llama-3.3-70b", "llama-4", "gemma", "mistral"];
     const score = (id: string) => { const i = pref.findIndex((p) => id.includes(p)); return i === -1 ? pref.length : i; };
     return free.sort((a, b) => score(a) - score(b) || a.localeCompare(b)).slice(0, 8);

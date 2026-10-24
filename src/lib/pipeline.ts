@@ -316,29 +316,55 @@ export async function runLawGuide(question: string, language: string) {
   const { z } = await import("zod");
   const { OFFICIAL_SOURCES } = await import("@/lib/sources");
   await logSkill("know-your-law", "started", question.slice(0, 80));
-  const Terms = z.object({ terms: z.array(z.string()).default([]) });
-  const t = await runJsonAgent(
-    "Nirdesh_LawGuide (search terms)",
-    Terms,
-    {
-      system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
-      user: question,
-      effort: "low",
-      maxTokens: 4000,
-    },
-    "00000000-0000-0000-0000-000000000000",
-  ).catch(() => ({ terms: [] as string[] }));
-  const q = [question, ...t.terms].join(" ");
-  const found = await api<{ chunks: LawChunk[]; documents: LawChunk["document"][] }>(
-    `/api/law?k=12&q=${encodeURIComponent(q)}`,
-  );
+  type Found = { chunks: LawChunk[]; documents: LawChunk["document"][] };
+  const search = (q: string) => api<Found>(`/api/law?k=12&q=${encodeURIComponent(q)}`);
+  // 1. Search the library with the question itself.
+  let found = await search(question);
+  // 2. Nothing found but the library has Acts? Let the AI suggest English search terms and try once more.
+  if (!found.chunks.length && found.documents.length) {
+    const Terms = z.object({ terms: z.array(z.string()).default([]) });
+    const t = await runJsonAgent(
+      "Nirdesh_LawGuide (search terms)",
+      Terms,
+      {
+        system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
+        user: question,
+        effort: "low",
+        maxTokens: 4000,
+      },
+      "00000000-0000-0000-0000-000000000000",
+    ).catch(() => ({ terms: [] as string[] }));
+    if (t.terms.length) found = await search([question, ...t.terms].join(" "));
+  }
+  // 3. Still nothing: answer with the fixed "not in library" text. No AI call, so nothing can be guessed.
+  if (!found.chunks.length) {
+    const { NOT_IN_LIBRARY } = await import("@/lib/notInLibrary");
+    const { sourcesFor } = await import("@/lib/sources");
+    const t = NOT_IN_LIBRARY[language] ?? NOT_IN_LIBRARY.English;
+    const official = [...new Set(["indiacode", ...sourcesFor(question).map((o) => o.id), "egazette"])];
+    const ans: LawAnswer = {
+      in_one_line: t.one, what_to_do: t.steps, law_says: [], be_careful: t.careful, uncertain: true,
+      uncertain_reason: t.reason, acts_used: [],
+      legal_aid: { summary: "The question concerns a law that is not in Nirdesh's library, so no section could be quoted.", facts_given: [], sections: [], open_questions: ["Which Act and section apply?", "Do the facts of my case change the answer?"] },
+      official_sources: official,
+    };
+    await api("/api/law", {
+      method: "POST",
+      json: { question, language, answer_layers: ans, acts_cited: [], uncertain: true, quotes: [], handoff: { summary: ans.legal_aid!.summary, sections: [], open_questions: ans.legal_aid!.open_questions } },
+    }).catch(() => {});
+    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true };
+  }
   const context = found.chunks
     .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
     .join("\n\n---\n\n");
   // Lenient on shape (small models return a boolean or a single string where a list is expected),
   // strict on content: quotes are still verified word for word against the Act afterwards.
-  const str = z.preprocess((v) => (v == null ? "" : typeof v === "string" ? v : Array.isArray(v) ? v.join("\n") : String(v)), z.string());
-  const strList = z.preprocess((v) => (v == null ? [] : Array.isArray(v) ? v.map(String) : [String(v)]), z.array(z.string()));
+  // Flatten anything a model returns (string, list, nested object) into readable text — never "[object Object]".
+  const flat = (v: unknown): string =>
+    v == null || v === false || v === true ? "" : typeof v === "string" ? v : typeof v === "number" ? String(v)
+      : Array.isArray(v) ? v.map(flat).filter(Boolean).join("\n") : Object.values(v as object).map(flat).filter(Boolean).join("\n");
+  const str = z.preprocess((v) => flat(v), z.string());
+  const strList = z.preprocess((v) => (v == null ? [] : Array.isArray(v) ? v.map(flat).filter(Boolean) : [flat(v)].filter(Boolean)), z.array(z.string()));
   const bool = z.preprocess((v) => (typeof v === "string" ? /^(true|yes)$/i.test(v.trim()) : Boolean(v)), z.boolean());
   const Answer = z.object({
     in_one_line: str,
@@ -381,5 +407,13 @@ export async function runLawGuide(question: string, language: string) {
       handoff: ans.legal_aid ? { summary: ans.legal_aid.summary, sections: ans.legal_aid.sections, open_questions: ans.legal_aid.open_questions } : null,
     },
   });
-  return { answer: ans, quoteChecks: saved.quote_checks, sources: found.chunks, documents: found.documents };
+  // Show only quotes that code found word for word in the uploaded Acts; drop the rest.
+  const keep = ans.law_says.map((_, i) => saved.quote_checks[i]?.verbatim === true);
+  const removedQuotes = keep.filter((k) => !k).length;
+  const shown: LawAnswer = { ...ans, law_says: ans.law_says.filter((_, i) => keep[i]) };
+  if (ans.law_says.length && !shown.law_says.length) {
+    shown.uncertain = true;
+    shown.uncertain_reason = `${ans.uncertain_reason ? ans.uncertain_reason + " " : ""}The AI's quotations could not be found word for word in the uploaded Acts, so they are not shown.`;
+  }
+  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false };
 }

@@ -19,7 +19,7 @@ export const OFFICIAL_SOURCES: OfficialSource[] = [
   {
     id: "indiacode", name: "India Code", url: "https://www.indiacode.nic.in", icon: "book", group: "Start here",
     topics: ["Every Central Act and its Rules", "FCRA, RTI, Consumer Protection, Legal Services, Trusts, Labour Codes, VB-G RAM G Act"],
-    keywords: ["act", "rules", "fcra", "foreign contribution", "right to information", "rti", "consumer", "legal services", "trust", "contempt", "limitation", "social security", "wages", "rozgar", "employment guarantee", "mgnrega", "vb-g ram g"],
+    keywords: ["act", "rules", "fcra", "police", "arrest", "fir", "bail", "criminal", "bnss", "crpc", "ipc", "bns", "sanhita", "foreign contribution", "right to information", "rti", "consumer", "legal services", "trust", "contempt", "limitation", "social security", "wages", "rozgar", "employment guarantee", "mgnrega", "vb-g ram g"],
   },
   {
     id: "egazette", name: "e-Gazette of India", url: "https://egazette.gov.in", icon: "newspaper", group: "Check the latest",
@@ -125,8 +125,10 @@ export const OFFICIAL_SOURCES: OfficialSource[] = [
 
 /** Official sources relevant to a piece of text (an Act title or a question), best matches first. */
 export function sourcesFor(text: string, limit = 3): OfficialSource[] {
-  const t = text.toLowerCase();
-  return OFFICIAL_SOURCES.map((s) => ({ s, n: s.keywords.filter((k) => t.includes(k)).length }))
+  const t = ` ${text.toLowerCase().replace(/[^a-z0-9\s-]/g, " ")} `;
+  // Whole-word match, so "procedure" does not match the company keyword "roc".
+  const has = (k: string) => t.includes(` ${k} `) || new RegExp(`\\b${k.replace(/[-]/g, "\\-")}\\b`).test(t);
+  return OFFICIAL_SOURCES.map((s) => ({ s, n: s.keywords.filter(has).length }))
     .filter((x) => x.n > 0)
     .sort((a, b) => b.n - a.n)
     .slice(0, limit)

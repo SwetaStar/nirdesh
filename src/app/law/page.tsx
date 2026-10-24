@@ -120,7 +120,18 @@ export default function LawPage() {
           </div>
           <div className="rounded-2xl border-2 border-line bg-white p-5">
             <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">The law says</h3>
-            {a.law_says.length === 0 && <p className="text-muted">No section from the uploaded Acts answers this directly.</p>}
+            {a.law_says.length === 0 && (
+              <p className="text-sm text-mist">
+                {r.notInLibrary
+                  ? "This law is not in Nirdesh's library, so nothing is quoted. Read the official text using the links below."
+                  : "No section from the uploaded Acts answers this directly."}
+              </p>
+            )}
+            {r.removedQuotes > 0 && (
+              <p className="mt-2 flex items-center gap-1 text-xs text-danger">
+                <AlertTriangle size={14} /> {r.removedQuotes} quotation{r.removedQuotes > 1 ? "s" : ""} from the AI {r.removedQuotes > 1 ? "were" : "was"} removed because {r.removedQuotes > 1 ? "they are" : "it is"} not in the uploaded Acts word for word.
+              </p>
+            )}
             <ul className="space-y-3">
               {a.law_says.map((l, i) => {
                 const ok = r.quoteChecks[i]?.verbatim;
