@@ -7,7 +7,7 @@
 
 import type { ZodType } from "zod";
 import { callModel, extractJson, type CallArgs } from "@/lib/ai/providers";
-import { CRITIC_PROMPT, EXTRACTOR_PROMPT, PLANNER_PROMPT } from "@/lib/ai/prompts";
+import { CITIZEN_PROMPT, CRITIC_PROMPT, EXTRACTOR_PROMPT, PLANNER_PROMPT } from "@/lib/ai/prompts";
 import { CriticOutput, ExtractorOutput } from "@/lib/schemas";
 import { CORRECTION_ROUNDS } from "@/lib/rules";
 
@@ -247,5 +247,45 @@ export async function runDraft(orderId: string, type: DraftType, directionId?: s
     orderId,
   );
   await api("/api/drafts", { method: "POST", json: { type, content: text, court_order_id: orderId, direction_id: directionId ?? null, model_used: model } });
+  return text;
+}
+
+export const LANGUAGES = [
+  { id: "English", native: "English" },
+  { id: "Hindi", native: "हिन्दी" },
+  { id: "Kannada", native: "ಕನ್ನಡ" },
+  { id: "Marathi", native: "मराठी" },
+  { id: "Telugu", native: "తెలుగు" },
+] as const;
+
+/** Citizen explanation: four layers, in the chosen language, from verified directions only. */
+export async function runExplainer(orderId: string, language: string, question?: string) {
+  const b = await api<{ order: Record<string, unknown>; directions: Record<string, unknown>[] }>(`/api/orders/${orderId}`);
+  const { contemptWindowEnds } = await import("@/lib/rules");
+  const dirs = b.directions
+    .filter((d) => d.status === "verified")
+    .map((d) => ({
+      label: d.label, summary: d.summary, quote: d.quote, paragraph: d.paragraph,
+      office: d.corrected_authority ?? d.responsible_authority, deadline: d.effective_deadline,
+      deadline_kind: d.task_status, period: d.corrected_period ?? d.period, trigger: d.corrected_trigger ?? d.trigger,
+      // Computed in code: one year from the date the deadline is missed (Contempt of Courts Act s.20).
+      contempt_petition_generally_by: contemptWindowEnds(d.effective_deadline as string | null),
+    }));
+  const { text, model } = await runAgent(
+    "Nirdesh_CitizenExplainer",
+    {
+      system: CITIZEN_PROMPT,
+      user:
+        `Preferred language: ${language}. Today's date: ${new Date().toISOString().slice(0, 10)}.\n` +
+        `Format: exactly four sections, each starting with a markdown heading "## " (headings in ${language}), in this order: ` +
+        `In one line; What you should do; What the order says; Be careful. Then the closing disclaimer line. Under 200 words in total.\n` +
+        `The user's question: ${question?.trim() || "Explain this court order to me."}\n\n` +
+        `CASE: ${JSON.stringify({ court: b.order.court, case_number: b.order.case_number, judgment_date: b.order.judgment_date, petitioners: b.order.petitioners, respondents: b.order.respondents })}\n\n` +
+        `VERIFIED DIRECTIONS (dates computed by the system — use them as given):\n${JSON.stringify(dirs, null, 2)}`,
+      effort: "medium",
+    },
+    orderId,
+  );
+  await api("/api/drafts", { method: "POST", json: { type: "citizen_explanation", content: text, court_order_id: orderId, language, model_used: model } });
   return text;
 }

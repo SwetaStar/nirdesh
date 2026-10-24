@@ -133,7 +133,7 @@ type GateChoice = { decision: "approved" | "corrected" | "rejected"; corrected_a
 export function Gate({ b, onDone }: { b: Bundle; onDone: () => void }) {
   const [choices, setChoices] = useState<Record<string, GateChoice>>({});
   // Gate only renders client-side after data loads, so reading localStorage here is safe.
-  const [name, setName] = useState(() => localStorage.getItem("nirdesh.officer") ?? "");
+  const [name, setName] = useState(() => (typeof window === "undefined" ? "" : localStorage.getItem("nirdesh.officer") ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const dirs = [...b.directions].sort((a, c) => Number(c.critic_result === "unresolved") - Number(a.critic_result === "unresolved"));

@@ -105,7 +105,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <Link href="/settings" className="font-medium text-brand underline">Add a key</Link>
           </div>
         )}
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 md:px-8">{children}</main>
+        <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 md:px-8">{children}</main>
       </div>
     </div>
   );
