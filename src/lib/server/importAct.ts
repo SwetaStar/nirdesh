@@ -94,6 +94,14 @@ export async function importOfficialAct(opts: {
     return { ok: false, pages: pdf.numPages, error: "This PDF is a scan without text. Download it and add it with the file upload above, so the AI can read it." };
 
   const found = titleFromText(text);
+  // Official servers sometimes return the wrong file: the title printed in the PDF must match the expected Act.
+  if (opts.title && found.title) {
+    const key = (t: string) => new Set(t.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter((w) => w.length > 3 && !["act", "code", "with", "from"].includes(w)));
+    const want = key(opts.title);
+    const got = key(found.title);
+    if (want.size && ![...want].some((w) => got.has(w)))
+      return { ok: false, pages: pdf.numPages, error: `The file from the official site is "${found.title}", not "${opts.title}" — the site returned the wrong document. Nothing was saved; try again later.` };
+  }
   const title = opts.title?.trim() || found.title;
   const year = opts.year ?? found.year;
   if (!title) return { ok: false, pages: pdf.numPages, error: "Could not read the Act's title from the PDF. Add a title and try again." };

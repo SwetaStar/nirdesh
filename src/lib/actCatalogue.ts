@@ -21,5 +21,5 @@ export const ACT_CATALOGUE: CatalogueAct[] = [
   { title: "Digital Personal Data Protection Act", year: 2023, url: "https://www.indiacode.nic.in/bitstream/123456789/22037/2/a2023-22.pdf", why: "Personal data rights", skills: KYL },
   { title: "Viksit Bharat – Guarantee for Rozgar and Ajeevika Mission (Gramin) Act", year: 2025, url: "https://www.indiacode.nic.in/bitstream/123456789/22478/1/a2025-36.pdf", why: "Rural employment guarantee", skills: ["know-your-law", "citizen-explainer"] },
   { title: "Code on Social Security", year: 2020, url: "https://www.indiacode.nic.in/handle/123456789/16823", why: "Pensions, PF, gratuity, maternity benefit", skills: KYL },
-  { title: "Indian Trusts Act", year: 1882, url: "https://www.indiacode.nic.in/handle/123456789/2327", why: "Private trusts and trustees", skills: KYL },
+  { title: "Indian Trusts Act", year: 1882, url: "https://www.indiacode.nic.in/bitstream/123456789/2327/3/A1882-02.pdf", why: "Private trusts and trustees", skills: KYL },
 ];
