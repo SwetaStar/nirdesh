@@ -62,6 +62,74 @@ function batches(chunks: Chunk[], maxChars = 1_500_000, maxItems = 300) {
   return out.filter((b) => b.length);
 }
 
+type LinkRow = { url: string; state: "waiting" | "working" | "ok" | "fail"; msg?: string };
+
+/** Paste official PDF links (one per line); the server downloads, reads and stores each Act. */
+function ImportFromLinks({ skills, onDone }: { skills: string[]; onDone: () => void }) {
+  const [text, setText] = useState("");
+  const [rows, setRows] = useState<LinkRow[]>([]);
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    const urls = [...new Set(text.split(/\s+/).map((u) => u.trim()).filter((u) => /^https?:\/\//.test(u)))];
+    if (!urls.length) return;
+    setBusy(true);
+    const list: LinkRow[] = urls.map((url) => ({ url, state: "waiting" }));
+    setRows([...list]);
+    for (let i = 0; i < list.length; i++) {
+      list[i] = { ...list[i], state: "working", msg: "Downloading from the official site…" };
+      setRows([...list]);
+      try {
+        const r = await api<{ ok: boolean; title?: string; year?: number | null; sections?: number; pages?: number; error?: string }>(
+          "/api/knowledge/import",
+          { method: "POST", json: { url: list[i].url, assigned_skills: skills } },
+        );
+        list[i] = r.ok
+          ? { ...list[i], state: "ok", msg: `${r.title}${r.year ? ` (${r.year})` : ""} — ${r.pages} pages, ${r.sections} sections added` }
+          : { ...list[i], state: "fail", msg: r.error };
+      } catch (e) {
+        list[i] = { ...list[i], state: "fail", msg: e instanceof Error ? e.message : "Failed" };
+      }
+      setRows([...list]);
+      onDone();
+    }
+    setBusy(false);
+  }
+
+  return (
+    <section className="card space-y-3 p-4">
+      <div>
+        <h2 className="text-sm font-semibold">Add from official links</h2>
+        <p className="mt-1 text-xs text-mist">
+          Paste direct PDF links from official sites (India Code, e-Gazette, ministries), one per line. Nirdesh downloads each file, reads the
+          title and year from it, splits it into sections and keeps the link for the nightly update check. Only government sites are accepted.
+        </p>
+      </div>
+      <textarea className="input min-h-28 font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)}
+        placeholder={"https://www.indiacode.nic.in/bitstream/123456789/2098/1/A201042.pdf\nhttps://www.indiacode.nic.in/bitstream/123456789/1514/1/A1971-70.pdf"} />
+      <button className="btn-primary" disabled={busy || !text.trim()} onClick={run}>
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} Fetch and add
+      </button>
+      {rows.length > 0 && (
+        <ul className="space-y-1.5 text-sm">
+          {rows.map((r) => (
+            <li key={r.url} className="flex items-start gap-2">
+              {r.state === "ok" ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" />
+                : r.state === "fail" ? <XCircle size={16} className="mt-0.5 shrink-0 text-danger" />
+                : r.state === "working" ? <Loader2 size={16} className="mt-0.5 shrink-0 animate-spin text-dusk" />
+                : <Clock size={16} className="mt-0.5 shrink-0 text-mist" />}
+              <span className="min-w-0">
+                <span className="block truncate font-mono text-xs text-mist">{r.url}</span>
+                {r.msg && <span className={r.state === "fail" ? "text-danger" : "text-ink"}>{r.msg}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function KnowledgePage() {
   const [docs, setDocs] = useState<Doc[] | null>(null);
   const [form, setForm] = useState({ title: "", act_year: "", version_note: "", type: "act", source_url: "" });
@@ -171,8 +239,10 @@ export default function KnowledgePage() {
         </section>
       )}
 
+      <ImportFromLinks skills={skills} onDone={load} />
+
       <section className="card space-y-4 p-4">
-        <h2 className="font-semibold">Add an Act or Rules</h2>
+        <h2 className="text-sm font-semibold">Or upload a PDF from your computer</h2>
         <div className="grid gap-3 sm:grid-cols-4">
           <input className="input sm:col-span-2" placeholder="Title, e.g. Foreign Contribution (Regulation) Act" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
           <input className="input" placeholder="Year, e.g. 2010" value={form.act_year} onChange={(e) => setForm({ ...form, act_year: e.target.value })} />
