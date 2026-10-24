@@ -1,4 +1,3 @@
-import "server-only";
 
 export interface Chunk {
   section_ref: string;

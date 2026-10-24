@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db, jsonError, logSkill, must } from "@/lib/server/db";
-import { keywords } from "@/lib/server/chunk";
+import { keywords } from "@/lib/chunk";
 import { normaliseForMatch } from "@/lib/rules";
 
 /**
