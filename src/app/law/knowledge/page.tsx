@@ -6,6 +6,7 @@ import { api, runAgent } from "@/lib/pipeline";
 import { activeConfig } from "@/lib/ai/providers";
 import { chunkAct, type Chunk } from "@/lib/chunk";
 import { ErrorBox } from "@/components/ui";
+import { ACT_CATALOGUE } from "@/lib/actCatalogue";
 import { PageHeader } from "@/components/Shell";
 
 interface Doc {
@@ -64,6 +65,66 @@ function batches(chunks: Chunk[], maxChars = 1_500_000, maxItems = 300) {
 
 type LinkRow = { url: string; state: "waiting" | "working" | "ok" | "fail"; msg?: string };
 
+/** One-click import of the recommended Acts from India Code. */
+function RecommendedActs({ docs, onDone }: { docs: Doc[]; onDone: () => void }) {
+  const inLibrary = (url: string, title: string) =>
+    docs.some((d) => d.status !== "superseded" && (d.source_url === url || d.title.toLowerCase().startsWith(title.toLowerCase().slice(0, 20))));
+  const [pick, setPick] = useState<string[]>(() => ACT_CATALOGUE.map((a) => a.url));
+  const [state, setState] = useState<Record<string, { s: "working" | "ok" | "fail"; msg?: string }>>({});
+  const [busy, setBusy] = useState(false);
+
+  async function run() {
+    setBusy(true);
+    for (const a of ACT_CATALOGUE.filter((x) => pick.includes(x.url) && !inLibrary(x.url, x.title))) {
+      setState((st) => ({ ...st, [a.url]: { s: "working", msg: "Downloading from India Code…" } }));
+      try {
+        const r = await api<{ ok: boolean; sections?: number; pages?: number; error?: string }>("/api/knowledge/import", {
+          method: "POST",
+          json: { url: a.url, title: a.title, act_year: a.year, assigned_skills: a.skills },
+        });
+        setState((st) => ({ ...st, [a.url]: r.ok ? { s: "ok", msg: `${r.pages} pages, ${r.sections} sections added` } : { s: "fail", msg: r.error } }));
+      } catch (e) {
+        setState((st) => ({ ...st, [a.url]: { s: "fail", msg: e instanceof Error ? e.message : "Failed" } }));
+      }
+      onDone();
+    }
+    setBusy(false);
+  }
+
+  const todo = ACT_CATALOGUE.filter((a) => pick.includes(a.url) && !inLibrary(a.url, a.title)).length;
+  return (
+    <section className="card space-y-3 p-4">
+      <div>
+        <h2 className="text-sm font-semibold">Recommended Acts from India Code</h2>
+        <p className="mt-1 text-xs text-mist">Official texts for the questions citizens ask most. Nirdesh downloads each from indiacode.nic.in and keeps the link for the nightly update check.</p>
+      </div>
+      <ul className="grid gap-1.5 md:grid-cols-2">
+        {ACT_CATALOGUE.map((a) => {
+          const have = inLibrary(a.url, a.title);
+          const st = state[a.url];
+          return (
+            <li key={a.url} className="flex items-start gap-2 rounded-lg border border-mist-line px-3 py-2 text-sm">
+              <input type="checkbox" className="mt-1" disabled={have || busy} checked={have || pick.includes(a.url)}
+                onChange={(e) => setPick(e.target.checked ? [...pick, a.url] : pick.filter((u) => u !== a.url))} />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium text-ink">{a.title}, {a.year}</span>
+                <span className="block text-xs text-mist">{a.why}</span>
+                {st && <span className={`block text-xs ${st.s === "fail" ? "text-danger" : st.s === "ok" ? "text-success" : "text-dusk"}`}>{st.msg}</span>}
+              </span>
+              {have ? <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-success" />
+                : st?.s === "working" ? <Loader2 size={16} className="mt-0.5 shrink-0 animate-spin text-dusk" />
+                : st?.s === "fail" ? <XCircle size={16} className="mt-0.5 shrink-0 text-danger" /> : null}
+            </li>
+          );
+        })}
+      </ul>
+      <button className="btn-primary" disabled={busy || todo === 0} onClick={run}>
+        {busy ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />} {todo ? `Import ${todo} Act${todo > 1 ? "s" : ""}` : "All selected Acts are in the library"}
+      </button>
+    </section>
+  );
+}
+
 /** Paste official PDF links (one per line); the server downloads, reads and stores each Act. */
 function ImportFromLinks({ skills, onDone }: { skills: string[]; onDone: () => void }) {
   const [text, setText] = useState("");
@@ -101,7 +162,7 @@ function ImportFromLinks({ skills, onDone }: { skills: string[]; onDone: () => v
       <div>
         <h2 className="text-sm font-semibold">Add from official links</h2>
         <p className="mt-1 text-xs text-mist">
-          Paste direct PDF links from official sites (India Code, e-Gazette, ministries), one per line. Nirdesh downloads each file, reads the
+          Paste links from official sites (India Code, e-Gazette, ministries), one per line — the PDF itself or the Act&apos;s India Code page. Nirdesh downloads each file, reads the
           title and year from it, splits it into sections and keeps the link for the nightly update check. Only government sites are accepted.
         </p>
       </div>
@@ -239,6 +300,7 @@ export default function KnowledgePage() {
         </section>
       )}
 
+      <RecommendedActs docs={docs ?? []} onDone={load} />
       <ImportFromLinks skills={skills} onDone={load} />
 
       <section className="card space-y-4 p-4">

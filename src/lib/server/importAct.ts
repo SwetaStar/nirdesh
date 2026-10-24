@@ -48,6 +48,8 @@ export interface ImportResult {
 /** Download an official PDF, read it, split it into sections and add it to the library as active. */
 export async function importOfficialAct(opts: {
   url: string; title?: string | null; year?: number | null; version_note?: string | null; assigned_skills?: string[]; timeoutMs?: number;
+  /** Set when the PDF link was found on this official page. */
+  followedFrom?: string;
 }): Promise<ImportResult> {
   if (!isOfficialUrl(opts.url)) return { ok: false, error: "Not an official government website. Only .gov.in / .nic.in and the listed official sites are allowed." };
   // India Code's file server often times out (504) on a first request; retry while time allows.
@@ -69,7 +71,22 @@ export async function importOfficialAct(opts: {
     }
   }
   if (!buf) return { ok: false, error: `${lastError} Tried several times — try again later, or download the PDF in your browser and use the file upload.` };
+
+  // Given an Act's page instead of its PDF (e.g. indiacode.nic.in/handle/123456789/2065), find the PDF on the page.
+  if (String.fromCharCode(...buf.slice(0, 5)) !== "%PDF-" && !opts.followedFrom) {
+    const html = new TextDecoder().decode(buf);
+    const page = new URL(opts.url);
+    const handle = page.pathname.match(/handle\/(\d+\/\d+)/)?.[1];
+    const links = [...html.matchAll(/href=["']([^"']+?\.pdf)(?:\?[^"']*)?["']/gi)]
+      .map((m) => { try { return new URL(m[1].replace(/&amp;/g, "&"), page).toString(); } catch { return null; } })
+      .filter((u): u is string => !!u && isOfficialUrl(u));
+    // Prefer the file that belongs to this Act's record.
+    const pdf = (handle && links.find((u) => u.includes(`/bitstream/${handle}/`))) || links.find((u) => u.includes("/bitstream/")) || links[0];
+    if (!pdf) return { ok: false, error: "No PDF found on that page. Open it in a browser and copy the PDF link (under 'View/Open')." };
+    return importOfficialAct({ ...opts, url: pdf, followedFrom: opts.url });
+  }
   if (String.fromCharCode(...buf.slice(0, 5)) !== "%PDF-") return { ok: false, error: "The link did not return a PDF. Use the direct PDF link (on India Code: the file under 'View/Open')." };
+  // When the PDF was found on an Act page, keep the PDF link (checked nightly) and note the page.
 
   const pdf = await getDocumentProxy(buf);
   const text = (await extractText(pdf, { mergePages: true })).text;
@@ -83,6 +100,8 @@ export async function importOfficialAct(opts: {
 
   const sb = db();
   const checksum = createHash("sha256").update(buf).digest("hex");
+  const sameLink = must(await sb.from("knowledge_documents").select("id, title").eq("source_url", opts.url).in("status", ["active", "pending"]));
+  if (sameLink.length) return { ok: false, title, year, error: `Already in the library (${sameLink[0].title}).` };
   const dup = must(await sb.from("knowledge_documents").select("id, title").eq("checksum", checksum).in("status", ["active", "pending"]));
   if (dup.length) return { ok: false, title, year, error: `Already in the library (${dup[0].title}).` };
 
