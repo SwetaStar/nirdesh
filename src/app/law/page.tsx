@@ -93,7 +93,7 @@ export default function LawPage() {
           ))}
         </div>
         <textarea className="input min-h-24" value={question} onChange={(e) => setQuestion(e.target.value)}
-          placeholder="e.g. I work at IIM Visakhapatnam. Am I a government servant for the purpose of being a trustee in an NGO applying for FCRA registration?" />
+          placeholder="Type your question here, in plain words." />
         {TINY_MODEL.test(model) && (
           <div className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
             Your AI model ({model}) is very small and often invents legal text, so its answers will usually be withheld.{" "}
