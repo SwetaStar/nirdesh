@@ -290,8 +290,23 @@ export async function runExplainer(orderId: string, language: string, question?:
     },
     orderId,
   );
-  await api("/api/drafts", { method: "POST", json: { type: "citizen_explanation", content: text, court_order_id: orderId, language, model_used: model } });
-  return text;
+  // Check in code that the explanation is really in the chosen language; if not, translate it once.
+  const { isInLanguage } = await import("@/lib/language");
+  let finalText = text;
+  if (!isInLanguage(text.replace(/\(([^)]*)\)/g, ""), language)) {
+    const t = await runAgent(
+      "Nirdesh_CitizenExplainer (translate)",
+      {
+        system: `Translate this explanation into ${language} at a class-8 reading level. Keep the four "## " headings (translated), paragraph numbers, dates and the disclaimer. Keep official names of offices in English in brackets. Do not add anything.`,
+        user: text,
+        effort: "low",
+      },
+      orderId,
+    ).catch(() => null);
+    if (t && isInLanguage(t.text.replace(/\(([^)]*)\)/g, ""), language)) finalText = t.text;
+  }
+  await api("/api/drafts", { method: "POST", json: { type: "citizen_explanation", content: finalText, court_order_id: orderId, language, model_used: model } });
+  return finalText;
 }
 
 export interface LawAnswer {
@@ -312,8 +327,11 @@ interface LawChunk {
 }
 
 /** Know Your Law: search terms -> keyword retrieval -> LawGuide four-layer answer -> code checks quotes. */
-export async function runLawGuide(question: string, language: string) {
+export async function runLawGuide(question: string, chosenLanguage: string) {
   const { z } = await import("zod");
+  const { languageOfText, isInLanguage } = await import("@/lib/language");
+  // Answer in the language the question is written in; for Latin-script questions use the chosen button.
+  const language = languageOfText(question, chosenLanguage) ?? chosenLanguage;
   const { OFFICIAL_SOURCES } = await import("@/lib/sources");
   await logSkill("know-your-law", "started", question.slice(0, 80));
   // Lenient on shape (small models return a boolean or a single string where a list is expected),
@@ -359,7 +377,7 @@ export async function runLawGuide(question: string, language: string) {
   // 3. Still nothing in the library. With Claude or Gemini, answer from official government websites
   //    (live search restricted to the official list); anything not backed by an official page is discarded.
   if (!found.chunks.length && canSearchOfficial()) {
-    const live = await runOfficialSearch(question, language, Answer).catch((e) => {
+    const live = await runOfficialSearch(question, language, Answer).then((r) => (r ? { ...r, language, languageNote: null as string | null } : r)).catch((e) => {
       console.warn("official search failed", e);
       return null;
     });
@@ -381,13 +399,13 @@ export async function runLawGuide(question: string, language: string) {
       method: "POST",
       json: { question, language, answer_layers: ans, acts_cited: [], uncertain: true, quotes: [], handoff: { summary: ans.legal_aid!.summary, sections: [], open_questions: ans.legal_aid!.open_questions } },
     }).catch(() => {});
-    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true, live: null, related: [] as { act: string; section: string; text: string }[] };
+    return { answer: ans, quoteChecks: [], sources: [], documents: found.documents, removedQuotes: 0, notInLibrary: true, live: null, related: [] as { act: string; section: string; text: string }[], language, languageNote: null as string | null };
   }
   const context = found.chunks
     .map((c, i) => `[C${i + 1}] ${c.document.title}${c.document.act_year ? ` (${c.document.act_year})` : ""}, ${c.section_ref}${c.document.version_note ? ` — version: ${c.document.version_note}` : ""}, uploaded ${c.document.uploaded_at.slice(0, 10)}\n${c.content}`)
     .join("\n\n---\n\n");
   const sourceList = OFFICIAL_SOURCES.map((o) => `${o.id}: ${o.name} (${o.url}) — ${o.topics.join("; ")}`).join("\n");
-  const ans = (await runJsonAgent(
+  let ans = (await runJsonAgent(
     "Nirdesh_LawGuide",
     Answer,
     {
@@ -405,6 +423,28 @@ export async function runLawGuide(question: string, language: string) {
     },
     "00000000-0000-0000-0000-000000000000",
   )) as LawAnswer;
+  // The answer must be in the chosen language. If not, ask the model to translate it (quotations unchanged).
+  let languageNote: string | null = null;
+  const visible = [ans.in_one_line, ...ans.what_to_do, ans.be_careful].join(" ");
+  if (!isInLanguage(visible, language)) {
+    try {
+      const translated = await runJsonAgent(
+        "Nirdesh_LawGuide (translate)",
+        Answer,
+        {
+          system: `Translate the text fields of this JSON into ${language} (simple words, class-8 level). Do NOT translate or change the "quote", "act", "section" or "chunk" fields. Keep the same JSON shape. Reply with the JSON only.`,
+          user: JSON.stringify(ans),
+          effort: "low",
+        },
+        "00000000-0000-0000-0000-000000000000",
+      );
+      const tv = [translated.in_one_line, ...translated.what_to_do, translated.be_careful].join(" ");
+      if (isInLanguage(tv, language)) ans = { ...translated, law_says: ans.law_says };
+      else languageNote = `The AI model could not answer in ${language}; the answer is shown in English. Try a stronger model in Settings.`;
+    } catch {
+      languageNote = `The AI model could not answer in ${language}; the answer is shown in English. Try a stronger model in Settings.`;
+    }
+  }
   const quotes = ans.law_says.map((l) => {
     const n = Number(l.chunk.replace(/\D/g, "")) - 1;
     return { text: l.quote, chunk_ids: found.chunks[n] ? [found.chunks[n].id] : found.chunks.map((c) => c.id) };
@@ -439,7 +479,7 @@ export async function runLawGuide(question: string, language: string) {
       text: c.content.length > 1200 ? `${c.content.slice(0, 1200)}…` : c.content,
     }));
   }
-  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false, live: null, related };
+  return { answer: shown, quoteChecks: shown.law_says.map((l) => ({ text: l.quote, verbatim: true })), sources: found.chunks, documents: found.documents, removedQuotes, notInLibrary: false, live: null, related, language, languageNote };
 }
 
 /** Know Your Law fallback: answer from official government websites only, clearly labelled as live search. */

@@ -101,6 +101,11 @@ export default function LawPage() {
 
       {a && r && (
         <section className="space-y-4">
+          {(r.languageNote || r.language !== lang) && (
+            <p className="text-xs text-mist">
+              {r.languageNote ?? `Answered in ${r.language}, the language your question is written in.`}
+            </p>
+          )}
           {r.live && (
             <div className="notice">
               <span>
