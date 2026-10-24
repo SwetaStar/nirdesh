@@ -122,7 +122,8 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
       const data = await res.json();
       return (data.models ?? [])
         .filter((m: { supportedGenerationMethods?: string[]; name: string }) =>
-          m.supportedGenerationMethods?.includes("generateContent") && /gemini/.test(m.name))
+          m.supportedGenerationMethods?.includes("generateContent") && /gemini/.test(m.name) &&
+          !/(tts|image|audio|live|embedding|robotics|computer-use)/.test(m.name))
         .map((m: { name: string; displayName?: string }) => ({
           id: m.name.replace(/^models\//, ""),
           label: m.displayName ? `${m.displayName} (${m.name.replace(/^models\//, "")})` : m.name,
@@ -137,6 +138,16 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
       return out.sort((a, b) => a.id.localeCompare(b.id));
     }
   }
+}
+
+/** A sensible model to pre-select from a live list (stable "flash"-class text model where possible). */
+export function recommendedModel(provider: ProviderId, models: { id: string }[]): string | undefined {
+  const ids = models.map((m) => m.id);
+  if (provider === "gemini") {
+    const stable = ids.filter((id) => /^gemini-[\d.]+-flash$/.test(id)).sort().reverse();
+    return stable[0] ?? ids.find((id) => /flash/.test(id) && !/lite/.test(id)) ?? ids[0];
+  }
+  return PROVIDERS[provider].defaultModels[0]?.id ?? ids[0];
 }
 
 function openAICompatible(provider: "openai" | "groq" | "openrouter", key: string) {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronDown, ChevronRight, Eye, EyeOff, Loader2, RefreshCw, XCircle } from "lucide-react";
 import {
-  PROVIDERS, callModel, listModels, loadSettings, saveSettings, type AISettings, type ProviderId,
+  PROVIDERS, callModel, listModels, loadSettings, recommendedModel, saveSettings, type AISettings, type ProviderId,
 } from "@/lib/ai/providers";
 import { PageHeader } from "@/components/Shell";
 
@@ -54,6 +54,18 @@ export default function SettingsPage() {
       const merged = [...PROVIDERS[p].defaultModels];
       for (const m of live) if (!merged.some((x) => x.id === m.id)) merged.push(m);
       setModels(merged);
+      // Nothing chosen yet (or the saved model no longer exists)? Pre-select a recommended one and save it,
+      // so the dropdown never shows a model that isn't actually selected.
+      const cur = loadSettings();
+      const saved = cur.model[p];
+      if (!saved || !merged.some((m) => m.id === saved)) {
+        const pick = recommendedModel(p, merged);
+        if (pick) {
+          const next = { ...cur, model: { ...cur.model, [p]: pick } };
+          saveSettings(next);
+          setS(next);
+        }
+      }
     } catch (e) {
       setModelErr(e instanceof Error ? e.message.slice(0, 200) : "Could not load models");
     } finally {
@@ -150,6 +162,7 @@ export default function SettingsPage() {
               value={model}
               onChange={(e) => update({ ...s, model: { ...s.model, [provider]: e.target.value } })}
             >
+              {!model && <option value="" disabled>Choose a model…</option>}
               {!models.some((m) => m.id === model) && model && <option value={model}>{model}</option>}
               {models.map((m) => (
                 <option key={m.id} value={m.id}>{m.label}</option>
