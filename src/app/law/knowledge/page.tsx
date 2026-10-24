@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { CheckCircle2, Clock, ExternalLink, Loader2, Pencil, Trash2, Upload, XCircle } from "lucide-react";
+import { CheckCircle2, Clock, Loader2, Pencil, RefreshCw, Trash2, Upload, XCircle } from "lucide-react";
 import { api, runAgent } from "@/lib/pipeline";
 import { activeConfig } from "@/lib/ai/providers";
 import { chunkAct, type Chunk } from "@/lib/chunk";
@@ -23,7 +23,6 @@ const SKILLS = [
   ["direction-extraction", "Extractor"],
 ] as const;
 
-const SYNC_URL = "https://github.com/SwetaStar/nirdesh/actions/workflows/sync-knowledge.yml";
 
 const STATUS_STYLE: Record<Doc["status"], string> = {
   active: "bg-emerald-100 text-emerald-800",
@@ -39,6 +38,7 @@ const CHECK_LABEL: Record<string, string> = {
   not_pdf: "Link did not return a PDF",
   scanned: "New file is scanned — upload by hand",
   superseded: "Replaced by a newer version",
+  removed_at_source: "Removed from the official site — not used in answers",
 };
 
 async function sha256(buf: ArrayBuffer) {
@@ -62,6 +62,16 @@ function batches(chunks: Chunk[], maxChars = 1_500_000, maxItems = 300) {
   }
   return out.filter((b) => b.length);
 }
+
+type CheckRow = { id: string; title: string; state: "waiting" | "working" | "unchanged" | "updated" | "removed_at_source" | "failed" | "scanned" | "not_pdf"; detail?: string };
+const CHECK_STYLE: Record<CheckRow["state"], string> = {
+  waiting: "text-mist", working: "text-dusk", unchanged: "text-success", updated: "text-dusk-deep font-medium",
+  removed_at_source: "text-danger", failed: "text-warning", scanned: "text-warning", not_pdf: "text-warning",
+};
+const CHECK_LABEL_SHORT: Record<CheckRow["state"], string> = {
+  waiting: "Waiting", working: "Checking the official site…", unchanged: "No change", updated: "Updated",
+  removed_at_source: "Removed at source", failed: "Could not check", scanned: "Changed (scan)", not_pdf: "Link changed",
+};
 
 type LinkRow = { url: string; state: "waiting" | "working" | "ok" | "fail"; msg?: string };
 
@@ -273,12 +283,70 @@ export default function KnowledgePage() {
     load();
   }
 
+  const [checks, setChecks] = useState<CheckRow[] | null>(null);
+  const [checking, setChecking] = useState(false);
+
+  /** "Check for updates": re-check every active document that has an official link, one at a time. */
+  async function checkAll() {
+    const list = (docs ?? []).filter((d) => d.status === "active" && d.source_url);
+    const rows: CheckRow[] = list.map((d) => ({ id: d.id, title: d.title, state: "waiting" }));
+    setChecks([...rows]);
+    setChecking(true);
+    for (let i = 0; i < rows.length; i++) {
+      rows[i] = { ...rows[i], state: "working" };
+      setChecks([...rows]);
+      try {
+        const r = await api<{ outcome: CheckRow["state"]; detail: string }>(`/api/knowledge/${rows[i].id}/check`, { method: "POST", json: {} });
+        rows[i] = { ...rows[i], state: r.outcome, detail: r.detail };
+      } catch (e) {
+        rows[i] = { ...rows[i], state: "failed", detail: e instanceof Error ? e.message : "Failed" };
+      }
+      setChecks([...rows]);
+    }
+    setChecking(false);
+    load();
+  }
+
   const pending = docs?.filter((d) => d.status === "pending") ?? [];
   const current = docs?.filter((d) => d.status !== "pending") ?? [];
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Law library" subtitle={<>Bare Acts and Rules that LawGuide may quote. Upload the official text (e.g. from India Code). Nirdesh never invents legal text.</>} />
+      <PageHeader title="Law library" subtitle={<>Bare Acts and Rules that LawGuide may quote. Upload the official text (e.g. from India Code). Nirdesh never invents legal text.</>}
+        action={
+          <button className="btn-primary" disabled={checking || !docs?.length} onClick={checkAll} title="Re-check every Act against its official link">
+            <RefreshCw size={16} className={checking ? "animate-spin" : ""} /> {checking ? "Checking…" : "Check for updates"}
+          </button>
+        }
+      />
+
+      {checks && (
+        <section className="card space-y-2 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Update check {checking ? "in progress" : "finished"}</h2>
+            {!checking && <button className="text-xs text-mist underline" onClick={() => setChecks(null)}>Close</button>}
+          </div>
+          <p className="text-xs text-mist">
+            Each Act is compared with the file on its official site. Changed → the new text replaces it (the old version is kept as superseded).
+            Removed at the source → taken out of answers (record kept). Site down → nothing changes.
+          </p>
+          <ul className="divide-y divide-mist-line text-sm">
+            {checks.map((c) => (
+              <li key={c.id} className="flex flex-wrap items-baseline gap-x-3 py-1.5">
+                <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                <span className={CHECK_STYLE[c.state]}>{c.state === "working" && <Loader2 size={12} className="mr-1 inline animate-spin" />}{CHECK_LABEL_SHORT[c.state]}</span>
+                {c.detail && c.state !== "unchanged" && <span className="w-full text-xs text-mist">{c.detail}</span>}
+              </li>
+            ))}
+          </ul>
+          {!checking && (
+            <p className="text-xs text-ink-soft">
+              {checks.filter((c) => c.state === "unchanged").length} unchanged · {checks.filter((c) => c.state === "updated").length} updated ·{" "}
+              {checks.filter((c) => c.state === "removed_at_source").length} removed at source · {checks.filter((c) => !["unchanged", "updated", "removed_at_source"].includes(c.state)).length} could not be checked
+            </p>
+          )}
+        </section>
+      )}
 
       {pending.length > 0 && (
         <section className="card space-y-3 border-amber-300 p-4">
@@ -336,9 +404,9 @@ export default function KnowledgePage() {
       <section className="card overflow-x-auto p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-semibold">In the library</h2>
-          <a href={SYNC_URL} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-xs text-muted hover:text-brand">
-            <Clock size={14} /> Update check runs nightly at 2:00 AM IST · run it now <ExternalLink size={12} />
-          </a>
+          <span className="flex items-center gap-1 text-xs text-mist">
+            <Clock size={14} /> Checked automatically every day at 2:00 AM IST · or use “Check for updates” above
+          </span>
         </div>
         {current.length === 0 && <p className="text-sm text-muted">No Acts yet. Until you add some, LawGuide will say the law is not in its knowledge base and offer a legal-aid handover.</p>}
         {current.length > 0 && (

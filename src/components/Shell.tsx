@@ -69,12 +69,15 @@ export function Clock() {
 }
 
 /** DayPilot page header: serif title with the clock on the same line, small grey subtitle below. */
-export function PageHeader({ title, subtitle, children }: { title: React.ReactNode; subtitle?: React.ReactNode; children?: React.ReactNode }) {
+export function PageHeader({ title, subtitle, action, children }: { title: React.ReactNode; subtitle?: React.ReactNode; action?: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="mb-6">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1>{title}</h1>
-        <Clock />
+        <div className="flex items-center gap-3">
+          <Clock />
+          {action}
+        </div>
       </div>
       {subtitle && <p className="mt-1 text-sm text-mist">{subtitle}</p>}
       {children}

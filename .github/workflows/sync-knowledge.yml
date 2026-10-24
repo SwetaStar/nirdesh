@@ -2,10 +2,10 @@
 # New versions are saved as "pending" and must be approved on the Law library page.
 name: Law library update check
 
+# The daily check now runs on Vercel in Mumbai (vercel.json crons -> /api/cron/check-laws), because
+# official Indian sites time out for GitHub's US servers. This workflow is kept for manual runs only.
 on:
-  schedule:
-    - cron: "30 20 * * *" # 20:30 UTC = 02:00 IST
-  workflow_dispatch: {}   # "Run workflow" button for a manual check
+  workflow_dispatch: {}
 
 permissions:
   contents: read
