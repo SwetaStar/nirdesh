@@ -69,7 +69,7 @@ export const PROVIDERS: Record<ProviderId, ProviderInfo> = {
     keyUrl: "https://openrouter.ai/keys",
     keyLabel: "OpenRouter API key",
     readsPdf: false,
-    note: "One key for many models, including free open-source ones. Text PDFs only.",
+    note: "One key for many models. Pick one ending in \":free\" unless you have added credit. Free models allow about 20 requests a minute and 50 a day without credit. Text PDFs only — use Claude or Gemini for scanned PDFs.",
     defaultModels: [],
   },
 };
@@ -134,8 +134,8 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
     case "openrouter": {
       const client = openAICompatible(provider, key);
       const out: { id: string; label: string }[] = [];
-      for await (const m of client.models.list()) out.push({ id: m.id, label: m.id });
-      return out.sort((a, b) => a.id.localeCompare(b.id));
+      for await (const m of client.models.list()) out.push({ id: m.id, label: m.id.endsWith(":free") ? `${m.id} — free` : m.id });
+      return out.sort((a, b) => Number(b.id.endsWith(":free")) - Number(a.id.endsWith(":free")) || a.id.localeCompare(b.id));
     }
   }
 }
@@ -143,6 +143,13 @@ export async function listModels(provider: ProviderId, key: string): Promise<{ i
 /** Models to try, best first, when looking for one that answers (skips retired Gemini 1.x/2.x). */
 export function candidateModels(provider: ProviderId, models: { id: string }[]): string[] {
   const ids = models.map((m) => m.id);
+  if (provider === "openrouter") {
+    // Without credit only ":free" models work; prefer the strongest open models.
+    const free = ids.filter((id) => id.endsWith(":free"));
+    const pref = ["gpt-oss-120b", "deepseek", "qwen3", "llama-3.3-70b", "llama-4", "gemma", "mistral"];
+    const score = (id: string) => { const i = pref.findIndex((p) => id.includes(p)); return i === -1 ? pref.length : i; };
+    return free.sort((a, b) => score(a) - score(b) || a.localeCompare(b)).slice(0, 8);
+  }
   if (provider !== "gemini") return [...new Set([...PROVIDERS[provider].defaultModels.map((m) => m.id), ...ids])].slice(0, 8);
   const current = ids.filter((id) => !/^gemini-(1|2)(\.|-)/.test(id));
   const rank = (id: string) =>
@@ -156,6 +163,7 @@ export function recommendedModel(provider: ProviderId, models: { id: string }[])
   if (provider === "gemini") {
     return candidateModels(provider, models)[0] ?? ids[0];
   }
+  if (provider === "openrouter") return candidateModels(provider, models)[0] ?? ids[0];
   return PROVIDERS[provider].defaultModels[0]?.id ?? ids[0];
 }
 
@@ -206,6 +214,8 @@ export function friendlyError(e: unknown, label: string, model: string): Error {
     return new Error(`This model is busy right now — the provider says it has high demand. Nirdesh retried automatically. Try again in a minute, or pick a different model in Settings.${tail}`);
   if (code === 429 || /quota|rate limit|resource.?exhausted/i.test(msg))
     return new Error(`Usage limit reached for this key (free tiers allow only a few requests per minute or per day). Wait a minute, or pick a different model in Settings.${tail}`);
+  if (code === 402 || /insufficient credits|requires more credits|payment required/i.test(msg))
+    return new Error(`This model needs paid credit. Pick a model ending in ":free" in Settings, or add credit with the provider.${tail}`);
   if (code === 401 || code === 403 || /api key|permission|unauthori[sz]ed|invalid.*key/i.test(msg))
     return new Error(`The provider rejected the key. Check that it was copied completely in Settings.${tail}`);
   if (code === 404 || /not found|does not exist|unsupported model/i.test(msg))
@@ -283,7 +293,8 @@ async function callModelRaw(args: CallArgs): Promise<CallResult> {
         { role: "system", content: args.system },
         { role: "user", content: args.user },
       ],
-      ...(args.json ? { response_format: { type: "json_object" as const } } : {}),
+      // Many OpenRouter free models reject response_format; the reply is still parsed and validated as JSON.
+      ...(args.json && provider !== "openrouter" ? { response_format: { type: "json_object" as const } } : {}),
     });
     text = res.choices[0]?.message?.content ?? "";
     if (res.choices[0]?.finish_reason === "length") throw new Error("The answer was cut off (too long). Try again.");
