@@ -4,6 +4,8 @@ import { importOfficialAct } from "@/lib/server/importAct";
 
 // Official sites can be slow; allow up to 5 minutes for one Act.
 export const maxDuration = 300;
+// India Code answers requests from India quickly but times out for overseas servers: run in Mumbai.
+export const preferredRegion = "bom1";
 
 const Body = z.object({
   url: z.string().url(),

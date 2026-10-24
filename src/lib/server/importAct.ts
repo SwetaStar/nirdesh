@@ -50,19 +50,25 @@ export async function importOfficialAct(opts: {
   url: string; title?: string | null; year?: number | null; version_note?: string | null; assigned_skills?: string[]; timeoutMs?: number;
 }): Promise<ImportResult> {
   if (!isOfficialUrl(opts.url)) return { ok: false, error: "Not an official government website. Only .gov.in / .nic.in and the listed official sites are allowed." };
-  let buf: Uint8Array;
-  try {
-    const res = await fetch(opts.url, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible; NirdeshLawLibrary/1.0)", Accept: "application/pdf,*/*" },
-      signal: AbortSignal.timeout(opts.timeoutMs ?? 90_000),
-      redirect: "follow",
-    });
-    if (!res.ok) return { ok: false, error: `The official site answered with error ${res.status}${res.status === 504 ? " (its server timed out — try again later)" : ""}.` };
-    buf = new Uint8Array(await res.arrayBuffer());
-  } catch (e) {
-    const timedOut = e instanceof Error && (e.name === "TimeoutError" || /timeout|aborted/i.test(e.message));
-    return { ok: false, error: timedOut ? "The official site did not respond in time. Try again later." : `Could not download: ${e instanceof Error ? e.message : e}` };
+  // India Code's file server often times out (504) on a first request; retry while time allows.
+  let buf: Uint8Array | null = null;
+  let lastError = "";
+  const deadline = Date.now() + (opts.timeoutMs ?? 90_000);
+  for (let attempt = 1; attempt <= 3 && !buf && Date.now() < deadline - 5_000; attempt++) {
+    try {
+      const res = await fetch(opts.url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/130 Safari/537.36", Accept: "application/pdf,*/*" },
+        signal: AbortSignal.timeout(Math.max(5_000, deadline - Date.now())),
+        redirect: "follow",
+      });
+      if (res.ok) buf = new Uint8Array(await res.arrayBuffer());
+      else lastError = `The official site answered with error ${res.status}${res.status === 504 ? " (its server timed out)" : ""}.`;
+    } catch (e) {
+      const timedOut = e instanceof Error && (e.name === "TimeoutError" || /timeout|aborted/i.test(e.message));
+      lastError = timedOut ? "The official site did not respond in time." : `Could not download: ${e instanceof Error ? e.message : e}`;
+    }
   }
+  if (!buf) return { ok: false, error: `${lastError} Tried several times — try again later, or download the PDF in your browser and use the file upload.` };
   if (String.fromCharCode(...buf.slice(0, 5)) !== "%PDF-") return { ok: false, error: "The link did not return a PDF. Use the direct PDF link (on India Code: the file under 'View/Open')." };
 
   const pdf = await getDocumentProxy(buf);
