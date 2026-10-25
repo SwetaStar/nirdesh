@@ -355,24 +355,29 @@ export async function runLawGuide(question: string, chosenLanguage: string) {
     official_sources: strList.default([]),
   });
   type Found = { chunks: LawChunk[]; documents: LawChunk["document"][] };
-  const search = (q: string) => api<Found>(`/api/law?k=12&q=${encodeURIComponent(q)}`);
+  const search = (q: string) => api<Found>(`/api/law?k=14&q=${encodeURIComponent(q)}`);
   // 1. Search the library with the question itself.
   let found = await search(question);
-  // 2. Nothing found but the library has Acts? Let the AI suggest English search terms and try once more.
-  if (!found.chunks.length && found.documents.length) {
+  // 2. If the library has Acts, ask the AI for the words the Acts themselves use (people say "how long to
+  //    reply", the RTI Act says "disposal of request ... thirty days") and search again with both.
+  if (found.documents.length) {
     const Terms = z.object({ terms: z.array(z.string()).default([]) });
     const t = await runJsonAgent(
       "Nirdesh_LawGuide (search terms)",
       Terms,
       {
-        system: "You turn a citizen's legal question (any language) into 4-10 short English search terms likely to appear in the text of Indian Bare Acts (e.g. 'government servant', 'registration', 'foreign contribution', 'trustee'). Reply as JSON: {\"terms\": [...]}.",
+        system:
+          "You turn a citizen's legal question (any language) into 5-12 short English search terms that would appear in the text of the relevant Indian Bare Act: the Act's name and its own legal wording (e.g. 'disposal of request', 'thirty days', 'detain in custody', 'twenty-four hours', 'Magistrate', 'foreign contribution', 'registration', 'District Commission', 'complaint'). Use current law: BNSS replaced CrPC, BNS replaced IPC. Reply as JSON: {\"terms\": [...]}.",
         user: question,
         effort: "low",
         maxTokens: 4000,
       },
       "00000000-0000-0000-0000-000000000000",
     ).catch(() => ({ terms: [] as string[] }));
-    if (t.terms.length) found = await search([question, ...t.terms].join(" "));
+    if (t.terms.length) {
+      const again = await search([question, ...t.terms].join(" "));
+      if (again.chunks.length) found = again;
+    }
   }
   // 3. Still nothing in the library. With Claude or Gemini, answer from official government websites
   //    (live search restricted to the official list); anything not backed by an official page is discarded.

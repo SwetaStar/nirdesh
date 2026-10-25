@@ -24,7 +24,13 @@ const ACT_ALIASES: [RegExp, string][] = [
 const SYNONYMS: Record<string, string[]> = {
   employ: ["servant", "employee"], employee: ["servant"], employed: ["servant"], job: ["employment"],
   ngo: ["association", "organisation"], trustee: ["trust"], donation: ["contribution"], fund: ["contribution"],
-  complaint: ["complaint"], refund: ["refund"], lawyer: ["advocate"], arrested: ["arrest"],
+  complaint: ["complaint"], complain: ["complaint"], refund: ["refund"], lawyer: ["advocate"], arrested: ["arrest", "custody"],
+  reply: ["disposal", "decision"], respond: ["disposal", "decision"], answer: ["disposal", "decision"],
+  long: ["period", "within", "days"], soon: ["within", "hours", "period"], time: ["period", "within"], deadline: ["period", "within"],
+  produced: ["custody", "detain", "magistrate"], jail: ["custody", "detain"], detained: ["detain", "custody"],
+  duties: ["duty", "bound"], duty: ["bound"], defective: ["defect", "deficiency", "liability"], faulty: ["defect"],
+  delete: ["erasure"], erase: ["erasure"], gig: ["platform"], parents: ["parent", "senior"], elderly: ["senior"],
+  donations: ["contribution"],
 };
 const stemOf = (w: string) => (w.length > 5 ? w.replace(/(ies|es|s|ed|ing)$/, "") : w);
 
